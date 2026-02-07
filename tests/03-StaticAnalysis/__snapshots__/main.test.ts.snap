@@ -1,0 +1,845 @@
+// Bun Snapshot v1, https://bun.sh/docs/test/snapshots
+
+exports[`Capsule source analysis 1`] = `
+{
+  "capsuleSourceLineRef": "encapsulate.dev/packages/encapsulate/tests/03-StaticAnalysis/main.test.ts:69",
+  "cst": {
+    "capsuleSourceLineRef": "encapsulate.dev/packages/encapsulate/tests/03-StaticAnalysis/main.test.ts:69",
+    "capsuleSourceUriLineRef": "@encapsulate.dev/encapsulate/tests/03-StaticAnalysis/main.test:69",
+    "source": {
+      "ambientReferences": {
+        "CapsulePropertyTypes": {
+          "importSpecifier": "{ CapsuleSpineFactory }",
+          "moduleUri": "../../src/spine-factories/CapsuleSpineFactory.v0",
+          "type": "assigned",
+        },
+        "makeImportStack": {
+          "importSpecifier": "{ CapsuleSpineFactory }",
+          "moduleUri": "../../src/spine-factories/CapsuleSpineFactory.v0",
+          "type": "assigned",
+        },
+        "prefix": {
+          "type": "literal",
+          "value": "capsule",
+        },
+      },
+      "capsuleExpression": 
+"encapsulate({
+        '#@encapsulate.dev/encapsulate/spine-contracts/CapsuleSpineContract.v0': {
+            '#': {
+                realm: {
+                    type: CapsulePropertyTypes.Literal,
+                    value: undefined
+                },
+                group: {
+                    type: CapsulePropertyTypes.Literal,
+                    value: 'Admin'
+                },
+                username: {
+                    type: CapsulePropertyTypes.String,
+                    value: undefined
+                },
+                hello: {
+                    type: CapsulePropertyTypes.Function,
+                    value: function (this: any): string {
+
+                        return \`[\${prefix}][\${this.realm}] Hello (capsule1): \${this.username}\`
+                    }
+                },
+                helloGetter1: {
+                    type: CapsulePropertyTypes.GetterFunction,
+                    value: function (this: any): string {
+
+                        return \`[\${prefix}][\${this.realm}] Hello (capsule1): \${this.username}\`
+                    }
+                },
+                helloGetter2: {
+                    type: CapsulePropertyTypes.GetterFunction,
+                    value: async function (this: any): Promise<string> {
+
+                        return \`[\${prefix}][\${this.realm}] Hello (capsule1): \${this.username}\`
+                    }
+                }
+            }
+        }
+    }, {
+        importMeta: import.meta,
+        importStack: makeImportStack(),
+        ambientReferences: {
+            prefix
+        }
+    })"
+,
+      "declarationLine": 29,
+      "definitionEndLine": 67,
+      "definitionStartLine": 29,
+      "importStackLine": 69,
+      "moduleFilepath": "encapsulate.dev/packages/encapsulate/tests/03-StaticAnalysis/main.test.ts",
+      "moduleLocalCode": {},
+      "moduleUri": "@encapsulate.dev/encapsulate/tests/03-StaticAnalysis/main.test",
+      "optionsEndLine": 73,
+      "optionsStartLine": 67,
+    },
+    "spineContracts": {
+      "#@encapsulate.dev/encapsulate/spine-contracts/CapsuleSpineContract.v0": {
+        "properties": {
+          "#": {
+            "properties": {
+              "group": {
+                "declarationLine": 36,
+                "definitionEndLine": 39,
+                "definitionStartLine": 36,
+                "type": "CapsulePropertyTypes.Literal",
+                "valueExpression": "'Admin'",
+                "valueType": "string",
+              },
+              "hello": {
+                "ambientReferences": {
+                  "prefix": {
+                    "type": "literal",
+                    "value": "capsule",
+                  },
+                },
+                "declarationLine": 44,
+                "definitionEndLine": 50,
+                "definitionStartLine": 44,
+                "moduleLocalCode": {},
+                "type": "CapsulePropertyTypes.Function",
+                "valueExpression": 
+"function (this: any): string {
+
+                        return \`[\${prefix}][\${this.realm}] Hello (capsule1): \${this.username}\`
+                    }"
+,
+                "valueType": "(this: any) => string",
+              },
+              "helloGetter1": {
+                "ambientReferences": {
+                  "prefix": {
+                    "type": "literal",
+                    "value": "capsule",
+                  },
+                },
+                "declarationLine": 51,
+                "definitionEndLine": 57,
+                "definitionStartLine": 51,
+                "moduleLocalCode": {},
+                "type": "CapsulePropertyTypes.GetterFunction",
+                "valueExpression": 
+"function (this: any): string {
+
+                        return \`[\${prefix}][\${this.realm}] Hello (capsule1): \${this.username}\`
+                    }"
+,
+                "valueType": "(this: any) => string",
+              },
+              "helloGetter2": {
+                "ambientReferences": {
+                  "prefix": {
+                    "type": "literal",
+                    "value": "capsule",
+                  },
+                },
+                "declarationLine": 58,
+                "definitionEndLine": 64,
+                "definitionStartLine": 58,
+                "moduleLocalCode": {},
+                "type": "CapsulePropertyTypes.GetterFunction",
+                "valueExpression": 
+"async function (this: any): Promise<string> {
+
+                        return \`[\${prefix}][\${this.realm}] Hello (capsule1): \${this.username}\`
+                    }"
+,
+                "valueType": "(this: any) => Promise<string>",
+              },
+              "realm": {
+                "declarationLine": 32,
+                "definitionEndLine": 35,
+                "definitionStartLine": 32,
+                "type": "CapsulePropertyTypes.Literal",
+                "valueExpression": "undefined",
+                "valueType": "any",
+              },
+              "username": {
+                "declarationLine": 40,
+                "definitionEndLine": 43,
+                "definitionStartLine": 40,
+                "type": "CapsulePropertyTypes.String",
+                "valueExpression": "undefined",
+                "valueType": "any",
+              },
+            },
+            "propertyContractUri": "",
+          },
+        },
+      },
+    },
+  },
+  "definition": {
+    "#@encapsulate.dev/encapsulate/spine-contracts/CapsuleSpineContract.v0": {
+      "#": {
+        "group": {
+          "type": "Literal",
+          "value": "Admin",
+        },
+        "hello": {
+          "type": "Function",
+        },
+        "helloGetter1": {
+          "type": "GetterFunction",
+        },
+        "helloGetter2": {
+          "type": "GetterFunction",
+        },
+        "realm": {
+          "type": "Literal",
+        },
+        "username": {
+          "type": "String",
+        },
+      },
+    },
+  },
+  "encapsulateOptions": {
+    "ambientReferences": {
+      "prefix": "capsule",
+    },
+    "capsuleSourceLineRef": "encapsulate.dev/packages/encapsulate/tests/03-StaticAnalysis/main.test.ts:69",
+    "importStackLine": 69,
+    "moduleFilepath": "encapsulate.dev/packages/encapsulate/tests/03-StaticAnalysis/main.test.ts",
+  },
+}
+`;
+
+exports[`Capsule source analysis 2`] = `
+{
+  "capsuleSourceLineRef": "encapsulate.dev/packages/encapsulate/tests/03-StaticAnalysis/main.test.ts:120",
+  "cst": {
+    "capsuleSourceLineRef": "encapsulate.dev/packages/encapsulate/tests/03-StaticAnalysis/main.test.ts:120",
+    "capsuleSourceUriLineRef": "@encapsulate.dev/encapsulate/tests/03-StaticAnalysis/main.test:120",
+    "source": {
+      "ambientReferences": {
+        "CapsulePropertyTypes": {
+          "importSpecifier": "{ CapsuleSpineFactory }",
+          "moduleUri": "../../src/spine-factories/CapsuleSpineFactory.v0",
+          "type": "assigned",
+        },
+        "capsule1": {
+          "type": "capsule",
+          "value": {
+            "capsuleSourceLineRef": "encapsulate.dev/packages/encapsulate/tests/03-StaticAnalysis/main.test.ts:69",
+          },
+        },
+        "makeImportStack": {
+          "importSpecifier": "{ CapsuleSpineFactory }",
+          "moduleUri": "../../src/spine-factories/CapsuleSpineFactory.v0",
+          "type": "assigned",
+        },
+        "prefix": {
+          "type": "literal",
+          "value": "capsule",
+        },
+      },
+      "capsuleExpression": 
+"encapsulate({
+        '#@encapsulate.dev/encapsulate/spine-contracts/CapsuleSpineContract.v0': {
+            '#': {
+                mappedCapsule: {
+                    type: CapsulePropertyTypes.Mapping,
+                    value: capsule1,
+                    options: async ({ constants }: { constants: any }) => {
+                        return {
+                            '#': {
+                                realm: \`realm:\${constants.group}\`
+                            }
+                        }
+                    }
+                },
+                username: {
+                    type: CapsulePropertyTypes.String,
+                    value: undefined
+                },
+                hello: {
+                    type: CapsulePropertyTypes.Function,
+                    value: function (this: any): string {
+
+                        const mappedCapsuleResponse = this.mappedCapsule.hello()
+
+                        return \`[\${prefix}] Hello (capsule2): \${this.username} [mappedCapsule.hello: \${mappedCapsuleResponse}]\`
+                    }
+                },
+                helloGetter1: {
+                    type: CapsulePropertyTypes.GetterFunction,
+                    value: function (this: any): string {
+
+                        return \`[\${prefix}] Hello (capsule2): \${this.username}\`
+                    }
+                },
+                helloGetter2: {
+                    type: CapsulePropertyTypes.GetterFunction,
+                    value: async function (this: any): Promise<string> {
+
+                        return \`[\${prefix}] Hello (capsule2): \${this.username}\`
+                    }
+                }
+            }
+        }
+    }, {
+        importMeta: import.meta,
+        importStack: makeImportStack(),
+        ambientReferences: {
+            prefix,
+            capsule1
+        }
+    })"
+,
+      "declarationLine": 75,
+      "definitionEndLine": 118,
+      "definitionStartLine": 75,
+      "importStackLine": 120,
+      "moduleFilepath": "encapsulate.dev/packages/encapsulate/tests/03-StaticAnalysis/main.test.ts",
+      "moduleLocalCode": {},
+      "moduleUri": "@encapsulate.dev/encapsulate/tests/03-StaticAnalysis/main.test",
+      "optionsEndLine": 125,
+      "optionsStartLine": 118,
+    },
+    "spineContracts": {
+      "#@encapsulate.dev/encapsulate/spine-contracts/CapsuleSpineContract.v0": {
+        "properties": {
+          "#": {
+            "properties": {
+              "hello": {
+                "ambientReferences": {
+                  "prefix": {
+                    "type": "literal",
+                    "value": "capsule",
+                  },
+                },
+                "declarationLine": 93,
+                "definitionEndLine": 101,
+                "definitionStartLine": 93,
+                "moduleLocalCode": {},
+                "type": "CapsulePropertyTypes.Function",
+                "valueExpression": 
+"function (this: any): string {
+
+                        const mappedCapsuleResponse = this.mappedCapsule.hello()
+
+                        return \`[\${prefix}] Hello (capsule2): \${this.username} [mappedCapsule.hello: \${mappedCapsuleResponse}]\`
+                    }"
+,
+                "valueType": "(this: any) => string",
+              },
+              "helloGetter1": {
+                "ambientReferences": {
+                  "prefix": {
+                    "type": "literal",
+                    "value": "capsule",
+                  },
+                },
+                "declarationLine": 102,
+                "definitionEndLine": 108,
+                "definitionStartLine": 102,
+                "moduleLocalCode": {},
+                "type": "CapsulePropertyTypes.GetterFunction",
+                "valueExpression": 
+"function (this: any): string {
+
+                        return \`[\${prefix}] Hello (capsule2): \${this.username}\`
+                    }"
+,
+                "valueType": "(this: any) => string",
+              },
+              "helloGetter2": {
+                "ambientReferences": {
+                  "prefix": {
+                    "type": "literal",
+                    "value": "capsule",
+                  },
+                },
+                "declarationLine": 109,
+                "definitionEndLine": 115,
+                "definitionStartLine": 109,
+                "moduleLocalCode": {},
+                "type": "CapsulePropertyTypes.GetterFunction",
+                "valueExpression": 
+"async function (this: any): Promise<string> {
+
+                        return \`[\${prefix}] Hello (capsule2): \${this.username}\`
+                    }"
+,
+                "valueType": "(this: any) => Promise<string>",
+              },
+              "mappedCapsule": {
+                "declarationLine": 78,
+                "definitionEndLine": 88,
+                "definitionStartLine": 78,
+                "type": "CapsulePropertyTypes.Mapping",
+                "valueExpression": "capsule1",
+                "valueType": "any",
+              },
+              "username": {
+                "declarationLine": 89,
+                "definitionEndLine": 92,
+                "definitionStartLine": 89,
+                "type": "CapsulePropertyTypes.String",
+                "valueExpression": "undefined",
+                "valueType": "any",
+              },
+            },
+            "propertyContractUri": "",
+          },
+        },
+      },
+    },
+  },
+  "definition": {
+    "#@encapsulate.dev/encapsulate/spine-contracts/CapsuleSpineContract.v0": {
+      "#": {
+        "hello": {
+          "type": "Function",
+        },
+        "helloGetter1": {
+          "type": "GetterFunction",
+        },
+        "helloGetter2": {
+          "type": "GetterFunction",
+        },
+        "mappedCapsule": {
+          "type": "Mapping",
+          "value": {
+            "capsuleSourceLineRef": "encapsulate.dev/packages/encapsulate/tests/03-StaticAnalysis/main.test.ts:69",
+            "cst": {
+              "capsuleSourceLineRef": "encapsulate.dev/packages/encapsulate/tests/03-StaticAnalysis/main.test.ts:69",
+              "capsuleSourceUriLineRef": "@encapsulate.dev/encapsulate/tests/03-StaticAnalysis/main.test:69",
+              "source": {
+                "ambientReferences": {
+                  "CapsulePropertyTypes": {
+                    "importSpecifier": "{ CapsuleSpineFactory }",
+                    "moduleUri": "../../src/spine-factories/CapsuleSpineFactory.v0",
+                    "type": "assigned",
+                  },
+                  "makeImportStack": {
+                    "importSpecifier": "{ CapsuleSpineFactory }",
+                    "moduleUri": "../../src/spine-factories/CapsuleSpineFactory.v0",
+                    "type": "assigned",
+                  },
+                  "prefix": {
+                    "type": "literal",
+                    "value": "capsule",
+                  },
+                },
+                "capsuleExpression": 
+"encapsulate({
+        '#@encapsulate.dev/encapsulate/spine-contracts/CapsuleSpineContract.v0': {
+            '#': {
+                realm: {
+                    type: CapsulePropertyTypes.Literal,
+                    value: undefined
+                },
+                group: {
+                    type: CapsulePropertyTypes.Literal,
+                    value: 'Admin'
+                },
+                username: {
+                    type: CapsulePropertyTypes.String,
+                    value: undefined
+                },
+                hello: {
+                    type: CapsulePropertyTypes.Function,
+                    value: function (this: any): string {
+
+                        return \`[\${prefix}][\${this.realm}] Hello (capsule1): \${this.username}\`
+                    }
+                },
+                helloGetter1: {
+                    type: CapsulePropertyTypes.GetterFunction,
+                    value: function (this: any): string {
+
+                        return \`[\${prefix}][\${this.realm}] Hello (capsule1): \${this.username}\`
+                    }
+                },
+                helloGetter2: {
+                    type: CapsulePropertyTypes.GetterFunction,
+                    value: async function (this: any): Promise<string> {
+
+                        return \`[\${prefix}][\${this.realm}] Hello (capsule1): \${this.username}\`
+                    }
+                }
+            }
+        }
+    }, {
+        importMeta: import.meta,
+        importStack: makeImportStack(),
+        ambientReferences: {
+            prefix
+        }
+    })"
+,
+                "declarationLine": 29,
+                "definitionEndLine": 67,
+                "definitionStartLine": 29,
+                "importStackLine": 69,
+                "moduleFilepath": "encapsulate.dev/packages/encapsulate/tests/03-StaticAnalysis/main.test.ts",
+                "moduleLocalCode": {},
+                "moduleUri": "@encapsulate.dev/encapsulate/tests/03-StaticAnalysis/main.test",
+                "optionsEndLine": 73,
+                "optionsStartLine": 67,
+              },
+              "spineContracts": {
+                "#@encapsulate.dev/encapsulate/spine-contracts/CapsuleSpineContract.v0": {
+                  "properties": {
+                    "#": {
+                      "properties": {
+                        "group": {
+                          "declarationLine": 36,
+                          "definitionEndLine": 39,
+                          "definitionStartLine": 36,
+                          "type": "CapsulePropertyTypes.Literal",
+                          "valueExpression": "'Admin'",
+                          "valueType": "string",
+                        },
+                        "hello": {
+                          "ambientReferences": {
+                            "prefix": {
+                              "type": "literal",
+                              "value": "capsule",
+                            },
+                          },
+                          "declarationLine": 44,
+                          "definitionEndLine": 50,
+                          "definitionStartLine": 44,
+                          "moduleLocalCode": {},
+                          "type": "CapsulePropertyTypes.Function",
+                          "valueExpression": 
+"function (this: any): string {
+
+                        return \`[\${prefix}][\${this.realm}] Hello (capsule1): \${this.username}\`
+                    }"
+,
+                          "valueType": "(this: any) => string",
+                        },
+                        "helloGetter1": {
+                          "ambientReferences": {
+                            "prefix": {
+                              "type": "literal",
+                              "value": "capsule",
+                            },
+                          },
+                          "declarationLine": 51,
+                          "definitionEndLine": 57,
+                          "definitionStartLine": 51,
+                          "moduleLocalCode": {},
+                          "type": "CapsulePropertyTypes.GetterFunction",
+                          "valueExpression": 
+"function (this: any): string {
+
+                        return \`[\${prefix}][\${this.realm}] Hello (capsule1): \${this.username}\`
+                    }"
+,
+                          "valueType": "(this: any) => string",
+                        },
+                        "helloGetter2": {
+                          "ambientReferences": {
+                            "prefix": {
+                              "type": "literal",
+                              "value": "capsule",
+                            },
+                          },
+                          "declarationLine": 58,
+                          "definitionEndLine": 64,
+                          "definitionStartLine": 58,
+                          "moduleLocalCode": {},
+                          "type": "CapsulePropertyTypes.GetterFunction",
+                          "valueExpression": 
+"async function (this: any): Promise<string> {
+
+                        return \`[\${prefix}][\${this.realm}] Hello (capsule1): \${this.username}\`
+                    }"
+,
+                          "valueType": "(this: any) => Promise<string>",
+                        },
+                        "realm": {
+                          "declarationLine": 32,
+                          "definitionEndLine": 35,
+                          "definitionStartLine": 32,
+                          "type": "CapsulePropertyTypes.Literal",
+                          "valueExpression": "undefined",
+                          "valueType": "any",
+                        },
+                        "username": {
+                          "declarationLine": 40,
+                          "definitionEndLine": 43,
+                          "definitionStartLine": 40,
+                          "type": "CapsulePropertyTypes.String",
+                          "valueExpression": "undefined",
+                          "valueType": "any",
+                        },
+                      },
+                      "propertyContractUri": "",
+                    },
+                  },
+                },
+              },
+            },
+            "definition": {
+              "#@encapsulate.dev/encapsulate/spine-contracts/CapsuleSpineContract.v0": {
+                "#": {
+                  "group": {
+                    "type": "Literal",
+                    "value": "Admin",
+                  },
+                  "hello": {
+                    "type": "Function",
+                  },
+                  "helloGetter1": {
+                    "type": "GetterFunction",
+                  },
+                  "helloGetter2": {
+                    "type": "GetterFunction",
+                  },
+                  "realm": {
+                    "type": "Literal",
+                  },
+                  "username": {
+                    "type": "String",
+                  },
+                },
+              },
+            },
+            "encapsulateOptions": {
+              "ambientReferences": {
+                "prefix": "capsule",
+              },
+              "capsuleSourceLineRef": "encapsulate.dev/packages/encapsulate/tests/03-StaticAnalysis/main.test.ts:69",
+              "importStackLine": 69,
+              "moduleFilepath": "encapsulate.dev/packages/encapsulate/tests/03-StaticAnalysis/main.test.ts",
+            },
+          },
+        },
+        "username": {
+          "type": "String",
+        },
+      },
+    },
+  },
+  "encapsulateOptions": {
+    "ambientReferences": {
+      "capsule1": {
+        "capsuleSourceLineRef": "encapsulate.dev/packages/encapsulate/tests/03-StaticAnalysis/main.test.ts:69",
+        "cst": {
+          "capsuleSourceLineRef": "encapsulate.dev/packages/encapsulate/tests/03-StaticAnalysis/main.test.ts:69",
+          "capsuleSourceUriLineRef": "@encapsulate.dev/encapsulate/tests/03-StaticAnalysis/main.test:69",
+          "source": {
+            "ambientReferences": {
+              "CapsulePropertyTypes": {
+                "importSpecifier": "{ CapsuleSpineFactory }",
+                "moduleUri": "../../src/spine-factories/CapsuleSpineFactory.v0",
+                "type": "assigned",
+              },
+              "makeImportStack": {
+                "importSpecifier": "{ CapsuleSpineFactory }",
+                "moduleUri": "../../src/spine-factories/CapsuleSpineFactory.v0",
+                "type": "assigned",
+              },
+              "prefix": {
+                "type": "literal",
+                "value": "capsule",
+              },
+            },
+            "capsuleExpression": 
+"encapsulate({
+        '#@encapsulate.dev/encapsulate/spine-contracts/CapsuleSpineContract.v0': {
+            '#': {
+                realm: {
+                    type: CapsulePropertyTypes.Literal,
+                    value: undefined
+                },
+                group: {
+                    type: CapsulePropertyTypes.Literal,
+                    value: 'Admin'
+                },
+                username: {
+                    type: CapsulePropertyTypes.String,
+                    value: undefined
+                },
+                hello: {
+                    type: CapsulePropertyTypes.Function,
+                    value: function (this: any): string {
+
+                        return \`[\${prefix}][\${this.realm}] Hello (capsule1): \${this.username}\`
+                    }
+                },
+                helloGetter1: {
+                    type: CapsulePropertyTypes.GetterFunction,
+                    value: function (this: any): string {
+
+                        return \`[\${prefix}][\${this.realm}] Hello (capsule1): \${this.username}\`
+                    }
+                },
+                helloGetter2: {
+                    type: CapsulePropertyTypes.GetterFunction,
+                    value: async function (this: any): Promise<string> {
+
+                        return \`[\${prefix}][\${this.realm}] Hello (capsule1): \${this.username}\`
+                    }
+                }
+            }
+        }
+    }, {
+        importMeta: import.meta,
+        importStack: makeImportStack(),
+        ambientReferences: {
+            prefix
+        }
+    })"
+,
+            "declarationLine": 29,
+            "definitionEndLine": 67,
+            "definitionStartLine": 29,
+            "importStackLine": 69,
+            "moduleFilepath": "encapsulate.dev/packages/encapsulate/tests/03-StaticAnalysis/main.test.ts",
+            "moduleLocalCode": {},
+            "moduleUri": "@encapsulate.dev/encapsulate/tests/03-StaticAnalysis/main.test",
+            "optionsEndLine": 73,
+            "optionsStartLine": 67,
+          },
+          "spineContracts": {
+            "#@encapsulate.dev/encapsulate/spine-contracts/CapsuleSpineContract.v0": {
+              "properties": {
+                "#": {
+                  "properties": {
+                    "group": {
+                      "declarationLine": 36,
+                      "definitionEndLine": 39,
+                      "definitionStartLine": 36,
+                      "type": "CapsulePropertyTypes.Literal",
+                      "valueExpression": "'Admin'",
+                      "valueType": "string",
+                    },
+                    "hello": {
+                      "ambientReferences": {
+                        "prefix": {
+                          "type": "literal",
+                          "value": "capsule",
+                        },
+                      },
+                      "declarationLine": 44,
+                      "definitionEndLine": 50,
+                      "definitionStartLine": 44,
+                      "moduleLocalCode": {},
+                      "type": "CapsulePropertyTypes.Function",
+                      "valueExpression": 
+"function (this: any): string {
+
+                        return \`[\${prefix}][\${this.realm}] Hello (capsule1): \${this.username}\`
+                    }"
+,
+                      "valueType": "(this: any) => string",
+                    },
+                    "helloGetter1": {
+                      "ambientReferences": {
+                        "prefix": {
+                          "type": "literal",
+                          "value": "capsule",
+                        },
+                      },
+                      "declarationLine": 51,
+                      "definitionEndLine": 57,
+                      "definitionStartLine": 51,
+                      "moduleLocalCode": {},
+                      "type": "CapsulePropertyTypes.GetterFunction",
+                      "valueExpression": 
+"function (this: any): string {
+
+                        return \`[\${prefix}][\${this.realm}] Hello (capsule1): \${this.username}\`
+                    }"
+,
+                      "valueType": "(this: any) => string",
+                    },
+                    "helloGetter2": {
+                      "ambientReferences": {
+                        "prefix": {
+                          "type": "literal",
+                          "value": "capsule",
+                        },
+                      },
+                      "declarationLine": 58,
+                      "definitionEndLine": 64,
+                      "definitionStartLine": 58,
+                      "moduleLocalCode": {},
+                      "type": "CapsulePropertyTypes.GetterFunction",
+                      "valueExpression": 
+"async function (this: any): Promise<string> {
+
+                        return \`[\${prefix}][\${this.realm}] Hello (capsule1): \${this.username}\`
+                    }"
+,
+                      "valueType": "(this: any) => Promise<string>",
+                    },
+                    "realm": {
+                      "declarationLine": 32,
+                      "definitionEndLine": 35,
+                      "definitionStartLine": 32,
+                      "type": "CapsulePropertyTypes.Literal",
+                      "valueExpression": "undefined",
+                      "valueType": "any",
+                    },
+                    "username": {
+                      "declarationLine": 40,
+                      "definitionEndLine": 43,
+                      "definitionStartLine": 40,
+                      "type": "CapsulePropertyTypes.String",
+                      "valueExpression": "undefined",
+                      "valueType": "any",
+                    },
+                  },
+                  "propertyContractUri": "",
+                },
+              },
+            },
+          },
+        },
+        "definition": {
+          "#@encapsulate.dev/encapsulate/spine-contracts/CapsuleSpineContract.v0": {
+            "#": {
+              "group": {
+                "type": "Literal",
+                "value": "Admin",
+              },
+              "hello": {
+                "type": "Function",
+              },
+              "helloGetter1": {
+                "type": "GetterFunction",
+              },
+              "helloGetter2": {
+                "type": "GetterFunction",
+              },
+              "realm": {
+                "type": "Literal",
+              },
+              "username": {
+                "type": "String",
+              },
+            },
+          },
+        },
+        "encapsulateOptions": {
+          "ambientReferences": {
+            "prefix": "capsule",
+          },
+          "capsuleSourceLineRef": "encapsulate.dev/packages/encapsulate/tests/03-StaticAnalysis/main.test.ts:69",
+          "importStackLine": 69,
+          "moduleFilepath": "encapsulate.dev/packages/encapsulate/tests/03-StaticAnalysis/main.test.ts",
+        },
+      },
+      "prefix": "capsule",
+    },
+    "capsuleSourceLineRef": "encapsulate.dev/packages/encapsulate/tests/03-StaticAnalysis/main.test.ts:120",
+    "importStackLine": 120,
+    "moduleFilepath": "encapsulate.dev/packages/encapsulate/tests/03-StaticAnalysis/main.test.ts",
+  },
+}
+`;
