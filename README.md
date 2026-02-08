@@ -6,7 +6,7 @@ An *experimental* implementation of the [PrivateData.Space](https://privatedata.
 ***NOTE:** Not intended for direct use until it matures in light of the projects below.*
 
 It is being used to underpin:
-- [github.com/Stream44/turbo44](https://github.com/Stream44/turbo44), a web3 + AI ready workspace
+- [github.com/Stream44/t44](https://github.com/Stream44/t44), a web3 + AI ready workspace
 - [Stream44.Studio](https://stream44.studio), *A **full-stack IDE** for building **embodied distributed systems***.
 
 Notes

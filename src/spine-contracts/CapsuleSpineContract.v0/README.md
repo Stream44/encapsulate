@@ -13,7 +13,7 @@ Spine contracts define ecosystems as source code is written against these standa
 
 In practice there should only ever be very few spine contracts but there can be a plethora of different partial or full implementations of the same standard.
 
-This spine contract aims to realize a concrete implementation of the [PrivateData.Space](https://privatedata.space/) model for the purpose of building full-stack distributed applications & systems.
+This spine contract aims to realize a concrete implementation of the [PrivateData.Space](https://privatedata.space/) model for the purpose of building full-stack distributed JavaScript applications & systems.
 
 
 Example Capsule Source
