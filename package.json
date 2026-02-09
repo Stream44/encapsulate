@@ -1,27 +1,28 @@
 {
-    "name": "@stream44.studio/encapsulate",
-    "version": "0.2.0-rc.10",
-    "license": "MIT",
-    "repository": {
-        "type": "git",
-        "url": "git+https://github.com/Stream44/encapsulate.git"
-    },
-    "type": "module",
-    "exports": {
-        "./encapsulate": "./src/encapsulate.ts",
-        "./spine-contracts/CapsuleSpineContract.v0/Static.v0": "./src/spine-contracts/CapsuleSpineContract.v0/Static.v0.ts",
-        "./spine-contracts/CapsuleSpineContract.v0/Membrane.v0": "./src/spine-contracts/CapsuleSpineContract.v0/Membrane.v0.ts",
-        "./spine-factories/CapsuleSpineFactory.v0": "./src/spine-factories/CapsuleSpineFactory.v0.ts",
-        "./structs/Capsule.v0": "./structs/Capsule.v0.ts"
-    },
-    "dependencies": {
-        "typescript": "^5.9.3",
-        "chalk": "^5.6.2"
-    },
-    "devDependencies": {
-        "@types/bun": "^1.3.4",
-        "@types/node": "^25.0.3",
-        "bun-types": "^1.3.4",
-        "solid-js": "^1.9.11"
-    }
+  "name": "@stream44.studio/encapsulate",
+  "version": "0.2.0-rc.11",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Stream44/encapsulate.git"
+  },
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./encapsulate": "./src/encapsulate.ts",
+    "./spine-contracts/CapsuleSpineContract.v0/Static.v0": "./src/spine-contracts/CapsuleSpineContract.v0/Static.v0.ts",
+    "./spine-contracts/CapsuleSpineContract.v0/Membrane.v0": "./src/spine-contracts/CapsuleSpineContract.v0/Membrane.v0.ts",
+    "./spine-factories/CapsuleSpineFactory.v0": "./src/spine-factories/CapsuleSpineFactory.v0.ts",
+    "./structs/Capsule.v0": "./structs/Capsule.v0.ts"
+  },
+  "dependencies": {
+    "typescript": "^5.9.3",
+    "chalk": "^5.6.2"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.3.4",
+    "@types/node": "^25.0.3",
+    "bun-types": "^1.3.4",
+    "solid-js": "^1.9.11"
+  }
 }
