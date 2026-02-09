@@ -1,6 +1,6 @@
 {
     "name": "@stream44.studio/encapsulate",
-    "version": "0.2.0-rc.12",
+    "version": "0.2.0-rc.13",
     "license": "MIT",
     "repository": {
         "type": "git",
@@ -13,6 +13,7 @@
         "./spine-contracts/CapsuleSpineContract.v0/Static.v0": "./src/spine-contracts/CapsuleSpineContract.v0/Static.v0.ts",
         "./spine-contracts/CapsuleSpineContract.v0/Membrane.v0": "./src/spine-contracts/CapsuleSpineContract.v0/Membrane.v0.ts",
         "./spine-factories/CapsuleSpineFactory.v0": "./src/spine-factories/CapsuleSpineFactory.v0.ts",
+        "./spine-factories/TimingObserver": "./src/spine-factories/TimingObserver.ts",
         "./structs/Capsule.v0": "./structs/Capsule.v0.ts"
     },
     "dependencies": {
