@@ -31,7 +31,7 @@ Notes
 Provenance
 ===
 
-[![Gordian Open Integrity](https://github.com/Stream44/encapsulate/actions/workflows/gordian-open-integrity.yml/badge.svg)](https://github.com/Stream44/encapsulate/actions/workflows/gordian-open-integrity.yml?query=branch%3Amain) [![DCO Signatures](https://github.com/Stream44/encapsulate/actions/workflows/dco.yml/badge.svg)](https://github.com/Stream44/encapsulate/actions/workflows/dco.yml?query=branch%3Amain)
+[![Gordian Open Integrity](https://github.com/Stream44/encapsulate/actions/workflows/gordian-open-integrity.yaml/badge.svg)](https://github.com/Stream44/encapsulate/actions/workflows/gordian-open-integrity.yaml?query=branch%3Amain) [![DCO Signatures](https://github.com/Stream44/encapsulate/actions/workflows/dco.yaml/badge.svg)](https://github.com/Stream44/encapsulate/actions/workflows/dco.yaml?query=branch%3Amain)
 
 Repository DID: `did:repo:412cd408c657737343a6089ed6d5f0668a8bfb05`
 
