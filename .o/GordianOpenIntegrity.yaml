@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "envelope": "ur:envelope/lrtpsotanshdhdcxcekbcemtvagtfgutvltlwerngomnltenfglgzscsbkeodwwneybzmsfliycemtlboyaylftpsohdgltansgylftanshfhdcxftlbrpgabykpfzcsghsoecgazcpljldpntfefssksoaxykkkleenkknlcszektpttansgrhdcxlastfxdsdpaxplrdzcvwbbfessaopdksaeethhmubtgdluwdhhhhhsdycmbgvwbzoycsfncsfgoytpsojyfljljpieinhsjtgwjoihjtgajtjyihiojpinjykktpsokshnjkjkisdpihieeyececehescxfpfpfpfpfxeoglknhsfxehjzhtfygaehglghfeecfpfpfpfpgagdjtgoknhkfxgokpkkgmflgmgleogsdniofdemksksghgaidhdethfjnjegtecfxfphfeeflkphdkkjzkogwfecxjyeeeedpjkiniojtinjtiodpjeihkkoycsfztpsohdjktngdgmgwhflfaxhdimyawzaxjtlddndnlecyqzvdclkskotksafsskdmlgwpbgdszmrerncmuofpaxmkkeahluwnmoidbsiypedmaozsneykjpplurloolghesjedwjtbzstimswwladghiartdetynehekohebdptswmuzedtrelkhywpjnmdihbgaxchwzfmqzlugwtlioftimhkssfristkahtniecyttsgnbmsdwsb",
+  "mark": "241a7fe3",
+  "$defs": {
+    "envelope": {
+      "$ref": "https://datatracker.ietf.org/doc/draft-mcnally-envelope/"
+    },
+    "mark": {
+      "$ref": "https://github.com/BlockchainCommons/Research/blob/master/papers/bcr-2025-001-provenance-mark.md"
+    }
+  }
+}
+---
+# Repository DID: did:repo:412cd408c657737343a6089ed6d5f0668a8bfb05
+# Current Mark: 241a7fe3 (🅑 DARK CITY LAMB VIAL)
+# Inception Mark: 09c16324 (🅑 AXIS SAFE IDEA DARK)
+# XID(1c7e1c96) [
+#     'key': Bytes(78) [
+#         'allow': 'All'
+#     ]
+#     "GordianOpenIntegrity": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPnUzYCUuyRGRN3L+gH7xxTIbX8VmkM5CAV4GuXylvOE t44-signing-key"
+#     'provenance': Bytes(115)
+# ]
+# Trust established using https://github.com/Stream44/t44-BlockchainCommons.com
