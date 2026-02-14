@@ -307,49 +307,8 @@ export async function CapsuleSpineFactory({
             return await resolve(uri, parentFilepath, spineFilesystemRoot)
         },
         importCapsule: (() => {
-            const callSequence: string[] = []
-            const MAX_SEQUENCE = 300
-            const REPEAT_THRESHOLD = 3
-
-            function detectRepeatingSequence(seq: string[]): string[] | null {
-                const len = seq.length
-                // Check subsequences of length 2..len/3
-                for (let subLen = 2; subLen <= Math.floor(len / REPEAT_THRESHOLD); subLen++) {
-                    const tail = seq.slice(len - subLen)
-                    let repeats = 1
-                    for (let offset = subLen; offset <= len - subLen; offset += subLen) {
-                        const chunk = seq.slice(len - subLen - offset, len - offset)
-                        if (chunk.length === tail.length && chunk.every((v, i) => v === tail[i])) {
-                            repeats++
-                        } else {
-                            break
-                        }
-                    }
-                    if (repeats >= REPEAT_THRESHOLD) {
-                        return tail
-                    }
-                }
-                return null
-            }
-
-            let callCount = 0
-
             return async (filepath: string) => {
                 const shortPath = filepath.replace(/^.*\/genesis\//, '')
-
-                callCount++
-                callSequence.push(shortPath)
-                if (callSequence.length > MAX_SEQUENCE) {
-                    callSequence.splice(0, callSequence.length - MAX_SEQUENCE)
-                }
-
-                const repeating = detectRepeatingSequence(callSequence)
-                if (repeating) {
-                    throw new Error(
-                        `Circular capsule loading detected! The following sequence repeated ${REPEAT_THRESHOLD} times:\n` +
-                        repeating.map((p, i) => `  ${i + 1}. ${p}`).join('\n')
-                    )
-                }
 
                 timing?.record(`importCapsule: Called for ${shortPath}`)
                 const result = await registry.ensure(filepath, async () => {
