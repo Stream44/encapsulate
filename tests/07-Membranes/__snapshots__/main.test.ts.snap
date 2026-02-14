@@ -1,0 +1,688 @@
+// Bun Snapshot v1, https://bun.sh/docs/test/snapshots
+
+exports[`Membrane construction & execution 1`] = `
+[
+  {
+    "caller": {
+      "filepath": "encapsulate.dev/packages/encapsulate/tests/07-Membranes/main.test.ts",
+      "line": 155,
+      "stack": [
+        {
+          "column": 34,
+          "filepath": "encapsulate.dev/packages/encapsulate/src/spine-contracts/CapsuleSpineContract.v0/Membrane.v0.ts",
+          "function": "addCallerContextToEvent",
+          "line": 550,
+        },
+        {
+          "column": 22,
+          "filepath": "encapsulate.dev/packages/encapsulate/src/spine-contracts/CapsuleSpineContract.v0/Membrane.v0.ts",
+          "function": "get",
+          "line": 386,
+        },
+        {
+          "column": 41,
+          "filepath": "encapsulate.dev/packages/encapsulate/src/encapsulate.ts",
+          "function": "get",
+          "line": 170,
+        },
+        {
+          "column": 27,
+          "filepath": "encapsulate.dev/packages/encapsulate/tests/07-Membranes/main.test.ts",
+          "line": 155,
+        },
+        {
+          "column": 34,
+          "filepath": "encapsulate.dev/packages/encapsulate/src/encapsulate.ts",
+          "line": 269,
+        },
+        {
+          "column": 26,
+          "filepath": "encapsulate.dev/packages/encapsulate/tests/07-Membranes/main.test.ts",
+          "line": 132,
+        },
+      ],
+    },
+    "event": "get",
+    "eventIndex": 0,
+    "target": {
+      "capsuleSourceLineRef": "encapsulate.dev/packages/encapsulate/tests/07-Membranes/main.test.ts:67",
+      "capsuleSourceNameRef": "encapsulate.dev/packages/encapsulate/tests/07-Membranes/main.test.ts:capsule1",
+      "capsuleSourceNameRefHash": "c135300a14c12dfef18a5af75276ca3a",
+      "prop": "username",
+      "spineContractCapsuleInstanceId": "$encapsulate.dev/packages/encapsulate/tests/07-Membranes/main.test.ts:67",
+    },
+    "value": "World",
+  },
+  {
+    "args": [],
+    "caller": {
+      "filepath": "encapsulate.dev/packages/encapsulate/src/encapsulate.ts",
+      "line": 269,
+      "stack": [
+        {
+          "column": 34,
+          "filepath": "encapsulate.dev/packages/encapsulate/src/spine-contracts/CapsuleSpineContract.v0/Membrane.v0.ts",
+          "function": "addCallerContextToEvent",
+          "line": 550,
+        },
+        {
+          "column": 26,
+          "filepath": "encapsulate.dev/packages/encapsulate/src/spine-contracts/CapsuleSpineContract.v0/Membrane.v0.ts",
+          "line": 452,
+        },
+        {
+          "column": 49,
+          "filepath": "encapsulate.dev/packages/encapsulate/tests/07-Membranes/main.test.ts",
+          "line": 156,
+        },
+        {
+          "column": 34,
+          "filepath": "encapsulate.dev/packages/encapsulate/src/encapsulate.ts",
+          "line": 269,
+        },
+        {
+          "column": 26,
+          "filepath": "encapsulate.dev/packages/encapsulate/tests/07-Membranes/main.test.ts",
+          "line": 132,
+        },
+      ],
+    },
+    "event": "call",
+    "eventIndex": 1,
+    "target": {
+      "capsuleSourceLineRef": "encapsulate.dev/packages/encapsulate/tests/07-Membranes/main.test.ts:67",
+      "capsuleSourceNameRef": "encapsulate.dev/packages/encapsulate/tests/07-Membranes/main.test.ts:capsule1",
+      "capsuleSourceNameRefHash": "c135300a14c12dfef18a5af75276ca3a",
+      "prop": "hello",
+      "spineContractCapsuleInstanceId": "$encapsulate.dev/packages/encapsulate/tests/07-Membranes/main.test.ts:67",
+    },
+  },
+  {
+    "callEventIndex": 1,
+    "event": "call-result",
+    "eventIndex": 2,
+    "result": "[global] Hello (capsule1): World",
+    "target": {
+      "spineContractCapsuleInstanceId": "$encapsulate.dev/packages/encapsulate/tests/07-Membranes/main.test.ts:67",
+    },
+  },
+  {
+    "caller": {
+      "filepath": "encapsulate.dev/packages/encapsulate/tests/07-Membranes/main.test.ts",
+      "line": 157,
+      "stack": [
+        {
+          "column": 34,
+          "filepath": "encapsulate.dev/packages/encapsulate/src/spine-contracts/CapsuleSpineContract.v0/Membrane.v0.ts",
+          "function": "addCallerContextToEvent",
+          "line": 550,
+        },
+        {
+          "column": 22,
+          "filepath": "encapsulate.dev/packages/encapsulate/src/spine-contracts/CapsuleSpineContract.v0/Membrane.v0.ts",
+          "function": "get",
+          "line": 504,
+        },
+        {
+          "column": 41,
+          "filepath": "encapsulate.dev/packages/encapsulate/src/encapsulate.ts",
+          "function": "get",
+          "line": 170,
+        },
+        {
+          "column": 27,
+          "filepath": "encapsulate.dev/packages/encapsulate/tests/07-Membranes/main.test.ts",
+          "line": 157,
+        },
+        {
+          "column": 34,
+          "filepath": "encapsulate.dev/packages/encapsulate/src/encapsulate.ts",
+          "line": 269,
+        },
+        {
+          "column": 26,
+          "filepath": "encapsulate.dev/packages/encapsulate/tests/07-Membranes/main.test.ts",
+          "line": 132,
+        },
+      ],
+    },
+    "event": "get",
+    "eventIndex": 3,
+    "target": {
+      "capsuleSourceLineRef": "encapsulate.dev/packages/encapsulate/tests/07-Membranes/main.test.ts:67",
+      "capsuleSourceNameRef": "encapsulate.dev/packages/encapsulate/tests/07-Membranes/main.test.ts:capsule1",
+      "capsuleSourceNameRefHash": "c135300a14c12dfef18a5af75276ca3a",
+      "prop": "helloGetter1",
+      "spineContractCapsuleInstanceId": "$encapsulate.dev/packages/encapsulate/tests/07-Membranes/main.test.ts:67",
+    },
+    "value": "[global] Hello (capsule1): World",
+  },
+  {
+    "caller": {
+      "filepath": "encapsulate.dev/packages/encapsulate/tests/07-Membranes/main.test.ts",
+      "line": 158,
+      "stack": [
+        {
+          "column": 34,
+          "filepath": "encapsulate.dev/packages/encapsulate/src/spine-contracts/CapsuleSpineContract.v0/Membrane.v0.ts",
+          "function": "addCallerContextToEvent",
+          "line": 550,
+        },
+        {
+          "column": 22,
+          "filepath": "encapsulate.dev/packages/encapsulate/src/spine-contracts/CapsuleSpineContract.v0/Membrane.v0.ts",
+          "function": "get",
+          "line": 504,
+        },
+        {
+          "column": 41,
+          "filepath": "encapsulate.dev/packages/encapsulate/src/encapsulate.ts",
+          "function": "get",
+          "line": 170,
+        },
+        {
+          "column": 27,
+          "filepath": "encapsulate.dev/packages/encapsulate/tests/07-Membranes/main.test.ts",
+          "line": 158,
+        },
+        {
+          "column": 34,
+          "filepath": "encapsulate.dev/packages/encapsulate/src/encapsulate.ts",
+          "line": 269,
+        },
+        {
+          "column": 26,
+          "filepath": "encapsulate.dev/packages/encapsulate/tests/07-Membranes/main.test.ts",
+          "line": 132,
+        },
+      ],
+    },
+    "event": "get",
+    "eventIndex": 4,
+    "target": {
+      "capsuleSourceLineRef": "encapsulate.dev/packages/encapsulate/tests/07-Membranes/main.test.ts:67",
+      "capsuleSourceNameRef": "encapsulate.dev/packages/encapsulate/tests/07-Membranes/main.test.ts:capsule1",
+      "capsuleSourceNameRefHash": "c135300a14c12dfef18a5af75276ca3a",
+      "prop": "helloGetter2",
+      "spineContractCapsuleInstanceId": "$encapsulate.dev/packages/encapsulate/tests/07-Membranes/main.test.ts:67",
+    },
+    "value": {},
+  },
+  {
+    "caller": {
+      "filepath": "encapsulate.dev/packages/encapsulate/tests/07-Membranes/main.test.ts",
+      "line": 159,
+      "stack": [
+        {
+          "column": 34,
+          "filepath": "encapsulate.dev/packages/encapsulate/src/spine-contracts/CapsuleSpineContract.v0/Membrane.v0.ts",
+          "function": "addCallerContextToEvent",
+          "line": 550,
+        },
+        {
+          "column": 22,
+          "filepath": "encapsulate.dev/packages/encapsulate/src/spine-contracts/CapsuleSpineContract.v0/Membrane.v0.ts",
+          "function": "get",
+          "line": 386,
+        },
+        {
+          "column": 41,
+          "filepath": "encapsulate.dev/packages/encapsulate/src/encapsulate.ts",
+          "function": "get",
+          "line": 170,
+        },
+        {
+          "column": 27,
+          "filepath": "encapsulate.dev/packages/encapsulate/tests/07-Membranes/main.test.ts",
+          "line": 159,
+        },
+        {
+          "column": 34,
+          "filepath": "encapsulate.dev/packages/encapsulate/src/encapsulate.ts",
+          "line": 269,
+        },
+        {
+          "column": 26,
+          "filepath": "encapsulate.dev/packages/encapsulate/tests/07-Membranes/main.test.ts",
+          "line": 132,
+        },
+      ],
+    },
+    "event": "get",
+    "eventIndex": 5,
+    "target": {
+      "capsuleSourceLineRef": "encapsulate.dev/packages/encapsulate/tests/07-Membranes/main.test.ts:117",
+      "capsuleSourceNameRef": "encapsulate.dev/packages/encapsulate/tests/07-Membranes/main.test.ts:capsule2",
+      "capsuleSourceNameRefHash": "527337245ae8c05b3a0104b2e931a841",
+      "prop": "username",
+      "spineContractCapsuleInstanceId": "$encapsulate.dev/packages/encapsulate/tests/07-Membranes/main.test.ts:117",
+    },
+    "value": "Sun",
+  },
+  {
+    "args": [],
+    "caller": {
+      "filepath": "encapsulate.dev/packages/encapsulate/src/encapsulate.ts",
+      "line": 269,
+      "stack": [
+        {
+          "column": 34,
+          "filepath": "encapsulate.dev/packages/encapsulate/src/spine-contracts/CapsuleSpineContract.v0/Membrane.v0.ts",
+          "function": "addCallerContextToEvent",
+          "line": 550,
+        },
+        {
+          "column": 26,
+          "filepath": "encapsulate.dev/packages/encapsulate/src/spine-contracts/CapsuleSpineContract.v0/Membrane.v0.ts",
+          "line": 452,
+        },
+        {
+          "column": 49,
+          "filepath": "encapsulate.dev/packages/encapsulate/tests/07-Membranes/main.test.ts",
+          "line": 160,
+        },
+        {
+          "column": 34,
+          "filepath": "encapsulate.dev/packages/encapsulate/src/encapsulate.ts",
+          "line": 269,
+        },
+        {
+          "column": 26,
+          "filepath": "encapsulate.dev/packages/encapsulate/tests/07-Membranes/main.test.ts",
+          "line": 132,
+        },
+      ],
+    },
+    "event": "call",
+    "eventIndex": 6,
+    "target": {
+      "capsuleSourceLineRef": "encapsulate.dev/packages/encapsulate/tests/07-Membranes/main.test.ts:117",
+      "capsuleSourceNameRef": "encapsulate.dev/packages/encapsulate/tests/07-Membranes/main.test.ts:capsule2",
+      "capsuleSourceNameRefHash": "527337245ae8c05b3a0104b2e931a841",
+      "prop": "hello",
+      "spineContractCapsuleInstanceId": "$encapsulate.dev/packages/encapsulate/tests/07-Membranes/main.test.ts:117",
+    },
+  },
+  {
+    "args": [],
+    "caller": {
+      "filepath": "encapsulate.dev/packages/encapsulate/src/spine-contracts/CapsuleSpineContract.v0/Membrane.v0.ts",
+      "line": 455,
+      "stack": [
+        {
+          "column": 34,
+          "filepath": "encapsulate.dev/packages/encapsulate/src/spine-contracts/CapsuleSpineContract.v0/Membrane.v0.ts",
+          "function": "addCallerContextToEvent",
+          "line": 550,
+        },
+        {
+          "column": 26,
+          "filepath": "encapsulate.dev/packages/encapsulate/src/spine-contracts/CapsuleSpineContract.v0/Membrane.v0.ts",
+          "line": 452,
+        },
+        {
+          "column": 74,
+          "filepath": "encapsulate.dev/packages/encapsulate/tests/07-Membranes/.~caps/capsule2.ts",
+          "function": "value",
+          "line": 40,
+        },
+        {
+          "column": 36,
+          "filepath": "encapsulate.dev/packages/encapsulate/src/spine-contracts/CapsuleSpineContract.v0/Membrane.v0.ts",
+          "line": 455,
+        },
+        {
+          "column": 49,
+          "filepath": "encapsulate.dev/packages/encapsulate/tests/07-Membranes/main.test.ts",
+          "line": 160,
+        },
+        {
+          "column": 34,
+          "filepath": "encapsulate.dev/packages/encapsulate/src/encapsulate.ts",
+          "line": 269,
+        },
+        {
+          "column": 26,
+          "filepath": "encapsulate.dev/packages/encapsulate/tests/07-Membranes/main.test.ts",
+          "line": 132,
+        },
+      ],
+    },
+    "event": "call",
+    "eventIndex": 7,
+    "target": {
+      "capsuleSourceLineRef": "encapsulate.dev/packages/encapsulate/tests/07-Membranes/main.test.ts:67",
+      "capsuleSourceNameRef": "encapsulate.dev/packages/encapsulate/tests/07-Membranes/main.test.ts:capsule1",
+      "capsuleSourceNameRefHash": "c135300a14c12dfef18a5af75276ca3a",
+      "prop": "hello",
+      "spineContractCapsuleInstanceId": "$encapsulate.dev/packages/encapsulate/tests/07-Membranes/main.test.ts:67",
+    },
+  },
+  {
+    "callEventIndex": 7,
+    "event": "call-result",
+    "eventIndex": 8,
+    "result": "[realm:Admin] Hello (capsule1): World",
+    "target": {
+      "spineContractCapsuleInstanceId": "$encapsulate.dev/packages/encapsulate/tests/07-Membranes/main.test.ts:67",
+    },
+  },
+  {
+    "callEventIndex": 6,
+    "event": "call-result",
+    "eventIndex": 9,
+    "result": "Hello (capsule2): Sun [mappedCapsule.hello: [realm:Admin] Hello (capsule1): World]",
+    "target": {
+      "spineContractCapsuleInstanceId": "$encapsulate.dev/packages/encapsulate/tests/07-Membranes/main.test.ts:117",
+    },
+  },
+  {
+    "caller": {
+      "filepath": "encapsulate.dev/packages/encapsulate/tests/07-Membranes/main.test.ts",
+      "line": 161,
+      "stack": [
+        {
+          "column": 34,
+          "filepath": "encapsulate.dev/packages/encapsulate/src/spine-contracts/CapsuleSpineContract.v0/Membrane.v0.ts",
+          "function": "addCallerContextToEvent",
+          "line": 550,
+        },
+        {
+          "column": 22,
+          "filepath": "encapsulate.dev/packages/encapsulate/src/spine-contracts/CapsuleSpineContract.v0/Membrane.v0.ts",
+          "function": "get",
+          "line": 504,
+        },
+        {
+          "column": 41,
+          "filepath": "encapsulate.dev/packages/encapsulate/src/encapsulate.ts",
+          "function": "get",
+          "line": 170,
+        },
+        {
+          "column": 27,
+          "filepath": "encapsulate.dev/packages/encapsulate/tests/07-Membranes/main.test.ts",
+          "line": 161,
+        },
+        {
+          "column": 34,
+          "filepath": "encapsulate.dev/packages/encapsulate/src/encapsulate.ts",
+          "line": 269,
+        },
+        {
+          "column": 26,
+          "filepath": "encapsulate.dev/packages/encapsulate/tests/07-Membranes/main.test.ts",
+          "line": 132,
+        },
+      ],
+    },
+    "event": "get",
+    "eventIndex": 10,
+    "target": {
+      "capsuleSourceLineRef": "encapsulate.dev/packages/encapsulate/tests/07-Membranes/main.test.ts:117",
+      "capsuleSourceNameRef": "encapsulate.dev/packages/encapsulate/tests/07-Membranes/main.test.ts:capsule2",
+      "capsuleSourceNameRefHash": "527337245ae8c05b3a0104b2e931a841",
+      "prop": "helloGetter1",
+      "spineContractCapsuleInstanceId": "$encapsulate.dev/packages/encapsulate/tests/07-Membranes/main.test.ts:117",
+    },
+    "value": "Hello (capsule2): Sun",
+  },
+  {
+    "caller": {
+      "filepath": "encapsulate.dev/packages/encapsulate/tests/07-Membranes/main.test.ts",
+      "line": 162,
+      "stack": [
+        {
+          "column": 34,
+          "filepath": "encapsulate.dev/packages/encapsulate/src/spine-contracts/CapsuleSpineContract.v0/Membrane.v0.ts",
+          "function": "addCallerContextToEvent",
+          "line": 550,
+        },
+        {
+          "column": 22,
+          "filepath": "encapsulate.dev/packages/encapsulate/src/spine-contracts/CapsuleSpineContract.v0/Membrane.v0.ts",
+          "function": "get",
+          "line": 504,
+        },
+        {
+          "column": 41,
+          "filepath": "encapsulate.dev/packages/encapsulate/src/encapsulate.ts",
+          "function": "get",
+          "line": 170,
+        },
+        {
+          "column": 27,
+          "filepath": "encapsulate.dev/packages/encapsulate/tests/07-Membranes/main.test.ts",
+          "line": 162,
+        },
+        {
+          "column": 34,
+          "filepath": "encapsulate.dev/packages/encapsulate/src/encapsulate.ts",
+          "line": 269,
+        },
+        {
+          "column": 26,
+          "filepath": "encapsulate.dev/packages/encapsulate/tests/07-Membranes/main.test.ts",
+          "line": 132,
+        },
+      ],
+    },
+    "event": "get",
+    "eventIndex": 11,
+    "target": {
+      "capsuleSourceLineRef": "encapsulate.dev/packages/encapsulate/tests/07-Membranes/main.test.ts:117",
+      "capsuleSourceNameRef": "encapsulate.dev/packages/encapsulate/tests/07-Membranes/main.test.ts:capsule2",
+      "capsuleSourceNameRefHash": "527337245ae8c05b3a0104b2e931a841",
+      "prop": "helloGetter2",
+      "spineContractCapsuleInstanceId": "$encapsulate.dev/packages/encapsulate/tests/07-Membranes/main.test.ts:117",
+    },
+    "value": {},
+  },
+  {
+    "caller": {
+      "filepath": "encapsulate.dev/packages/encapsulate/tests/07-Membranes/main.test.ts",
+      "line": 163,
+      "stack": [
+        {
+          "column": 34,
+          "filepath": "encapsulate.dev/packages/encapsulate/src/spine-contracts/CapsuleSpineContract.v0/Membrane.v0.ts",
+          "function": "addCallerContextToEvent",
+          "line": 550,
+        },
+        {
+          "column": 22,
+          "filepath": "encapsulate.dev/packages/encapsulate/src/spine-contracts/CapsuleSpineContract.v0/Membrane.v0.ts",
+          "function": "get",
+          "line": 386,
+        },
+        {
+          "column": 41,
+          "filepath": "encapsulate.dev/packages/encapsulate/src/encapsulate.ts",
+          "function": "get",
+          "line": 170,
+        },
+        {
+          "column": 49,
+          "filepath": "encapsulate.dev/packages/encapsulate/tests/07-Membranes/main.test.ts",
+          "line": 163,
+        },
+        {
+          "column": 34,
+          "filepath": "encapsulate.dev/packages/encapsulate/src/encapsulate.ts",
+          "line": 269,
+        },
+        {
+          "column": 26,
+          "filepath": "encapsulate.dev/packages/encapsulate/tests/07-Membranes/main.test.ts",
+          "line": 132,
+        },
+      ],
+    },
+    "event": "get",
+    "eventIndex": 12,
+    "target": {
+      "capsuleSourceLineRef": "encapsulate.dev/packages/encapsulate/tests/07-Membranes/main.test.ts:67",
+      "capsuleSourceNameRef": "encapsulate.dev/packages/encapsulate/tests/07-Membranes/main.test.ts:capsule1",
+      "capsuleSourceNameRefHash": "c135300a14c12dfef18a5af75276ca3a",
+      "prop": "username",
+      "spineContractCapsuleInstanceId": "$encapsulate.dev/packages/encapsulate/tests/07-Membranes/main.test.ts:67",
+    },
+    "value": "World",
+  },
+  {
+    "args": [],
+    "caller": {
+      "filepath": "encapsulate.dev/packages/encapsulate/src/encapsulate.ts",
+      "line": 269,
+      "stack": [
+        {
+          "column": 34,
+          "filepath": "encapsulate.dev/packages/encapsulate/src/spine-contracts/CapsuleSpineContract.v0/Membrane.v0.ts",
+          "function": "addCallerContextToEvent",
+          "line": 550,
+        },
+        {
+          "column": 26,
+          "filepath": "encapsulate.dev/packages/encapsulate/src/spine-contracts/CapsuleSpineContract.v0/Membrane.v0.ts",
+          "line": 452,
+        },
+        {
+          "column": 63,
+          "filepath": "encapsulate.dev/packages/encapsulate/tests/07-Membranes/main.test.ts",
+          "line": 164,
+        },
+        {
+          "column": 34,
+          "filepath": "encapsulate.dev/packages/encapsulate/src/encapsulate.ts",
+          "line": 269,
+        },
+        {
+          "column": 26,
+          "filepath": "encapsulate.dev/packages/encapsulate/tests/07-Membranes/main.test.ts",
+          "line": 132,
+        },
+      ],
+    },
+    "event": "call",
+    "eventIndex": 13,
+    "target": {
+      "capsuleSourceLineRef": "encapsulate.dev/packages/encapsulate/tests/07-Membranes/main.test.ts:67",
+      "capsuleSourceNameRef": "encapsulate.dev/packages/encapsulate/tests/07-Membranes/main.test.ts:capsule1",
+      "capsuleSourceNameRefHash": "c135300a14c12dfef18a5af75276ca3a",
+      "prop": "hello",
+      "spineContractCapsuleInstanceId": "$encapsulate.dev/packages/encapsulate/tests/07-Membranes/main.test.ts:67",
+    },
+  },
+  {
+    "callEventIndex": 13,
+    "event": "call-result",
+    "eventIndex": 14,
+    "result": "[realm:Admin] Hello (capsule1): World",
+    "target": {
+      "spineContractCapsuleInstanceId": "$encapsulate.dev/packages/encapsulate/tests/07-Membranes/main.test.ts:67",
+    },
+  },
+  {
+    "caller": {
+      "filepath": "encapsulate.dev/packages/encapsulate/tests/07-Membranes/main.test.ts",
+      "line": 165,
+      "stack": [
+        {
+          "column": 34,
+          "filepath": "encapsulate.dev/packages/encapsulate/src/spine-contracts/CapsuleSpineContract.v0/Membrane.v0.ts",
+          "function": "addCallerContextToEvent",
+          "line": 550,
+        },
+        {
+          "column": 22,
+          "filepath": "encapsulate.dev/packages/encapsulate/src/spine-contracts/CapsuleSpineContract.v0/Membrane.v0.ts",
+          "function": "get",
+          "line": 504,
+        },
+        {
+          "column": 41,
+          "filepath": "encapsulate.dev/packages/encapsulate/src/encapsulate.ts",
+          "function": "get",
+          "line": 170,
+        },
+        {
+          "column": 49,
+          "filepath": "encapsulate.dev/packages/encapsulate/tests/07-Membranes/main.test.ts",
+          "line": 165,
+        },
+        {
+          "column": 34,
+          "filepath": "encapsulate.dev/packages/encapsulate/src/encapsulate.ts",
+          "line": 269,
+        },
+        {
+          "column": 26,
+          "filepath": "encapsulate.dev/packages/encapsulate/tests/07-Membranes/main.test.ts",
+          "line": 132,
+        },
+      ],
+    },
+    "event": "get",
+    "eventIndex": 15,
+    "target": {
+      "capsuleSourceLineRef": "encapsulate.dev/packages/encapsulate/tests/07-Membranes/main.test.ts:67",
+      "capsuleSourceNameRef": "encapsulate.dev/packages/encapsulate/tests/07-Membranes/main.test.ts:capsule1",
+      "capsuleSourceNameRefHash": "c135300a14c12dfef18a5af75276ca3a",
+      "prop": "helloGetter1",
+      "spineContractCapsuleInstanceId": "$encapsulate.dev/packages/encapsulate/tests/07-Membranes/main.test.ts:67",
+    },
+    "value": "[realm:Admin] Hello (capsule1): World",
+  },
+  {
+    "caller": {
+      "filepath": "encapsulate.dev/packages/encapsulate/tests/07-Membranes/main.test.ts",
+      "line": 166,
+      "stack": [
+        {
+          "column": 34,
+          "filepath": "encapsulate.dev/packages/encapsulate/src/spine-contracts/CapsuleSpineContract.v0/Membrane.v0.ts",
+          "function": "addCallerContextToEvent",
+          "line": 550,
+        },
+        {
+          "column": 22,
+          "filepath": "encapsulate.dev/packages/encapsulate/src/spine-contracts/CapsuleSpineContract.v0/Membrane.v0.ts",
+          "function": "get",
+          "line": 504,
+        },
+        {
+          "column": 41,
+          "filepath": "encapsulate.dev/packages/encapsulate/src/encapsulate.ts",
+          "function": "get",
+          "line": 170,
+        },
+        {
+          "column": 49,
+          "filepath": "encapsulate.dev/packages/encapsulate/tests/07-Membranes/main.test.ts",
+          "line": 166,
+        },
+        {
+          "column": 34,
+          "filepath": "encapsulate.dev/packages/encapsulate/src/encapsulate.ts",
+          "line": 269,
+        },
+        {
+          "column": 26,
+          "filepath": "encapsulate.dev/packages/encapsulate/tests/07-Membranes/main.test.ts",
+          "line": 132,
+        },
+      ],
+    },
+    "event": "get",
+    "eventIndex": 16,
+    "target": {
+      "capsuleSourceLineRef": "encapsulate.dev/packages/encapsulate/tests/07-Membranes/main.test.ts:67",
+      "capsuleSourceNameRef": "encapsulate.dev/packages/encapsulate/tests/07-Membranes/main.test.ts:capsule1",
+      "capsuleSourceNameRefHash": "c135300a14c12dfef18a5af75276ca3a",
+      "prop": "helloGetter2",
+      "spineContractCapsuleInstanceId": "$encapsulate.dev/packages/encapsulate/tests/07-Membranes/main.test.ts:67",
+    },
+    "value": {},
+  },
+]
+`;

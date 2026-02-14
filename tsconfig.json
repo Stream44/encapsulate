@@ -1,0 +1,30 @@
+{
+    "extends": "../../../tsconfig.paths.json",
+    "compilerOptions": {
+        "target": "ES2020",
+        "module": "esnext",
+        "lib": [
+            "ES2020",
+            "DOM"
+        ],
+        "types": [
+            "bun",
+            "node"
+        ],
+        "moduleResolution": "bundler",
+        "strict": true,
+        "esModuleInterop": true,
+        "skipLibCheck": true,
+        "forceConsistentCasingInFileNames": true,
+        "resolveJsonModule": true,
+        "allowSyntheticDefaultImports": true
+    },
+    "include": [
+        "src/**/*.ts",
+        "structs/**/*.ts",
+        "tests/**/*.ts"
+    ],
+    "exclude": [
+        "node_modules"
+    ]
+}
