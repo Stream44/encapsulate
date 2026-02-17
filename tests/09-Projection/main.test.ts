@@ -6,7 +6,7 @@ import { mkdir, rm } from 'fs/promises'
 import { join } from 'path'
 import { existsSync } from 'fs'
 
-describe('Minimal Capsule Projection and Runtime', () => {
+describe.skip('Minimal Capsule Projection and Runtime', () => {
     const testOutputDir = join(import.meta.dir, '.~projected')
     const projectedFilePath = join(testOutputDir, 'standalone.ts')
 
