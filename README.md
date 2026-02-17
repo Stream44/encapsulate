@@ -4,7 +4,7 @@
 
 ⚠️ **Disclaimer:** Under active development. Code has not been audited, APIs and interfaces are subject to change.
 
-[![Tests](https://github.com/Stream44/encapsulate/actions/workflows/tests.yaml/badge.svg)](https://github.com/Stream44/encapsulate/actions/workflows/tests.yaml?query=branch%3Amain)
+[![Tests](https://github.com/Stream44/encapsulate/actions/workflows/test.yaml/badge.svg)](https://github.com/Stream44/encapsulate/actions/workflows/test.yaml?query=branch%3Amain)
 
 encapsulate
 ===
