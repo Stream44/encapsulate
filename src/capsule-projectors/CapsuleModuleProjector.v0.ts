@@ -827,6 +827,15 @@ export function CapsuleModuleProjector({
                         const capsuleName = snapshot.spineContracts?.['#@stream44.studio/encapsulate/spine-contracts/CapsuleSpineContract.v0']?.['#@stream44.studio/encapsulate/structs/Capsule']?.capsuleName
                         const projectedFilepath = snapshot.spineContracts?.['#@stream44.studio/encapsulate/spine-contracts/CapsuleSpineContract.v0']?.['#@stream44.studio/encapsulate/structs/Capsule']?.projectedCapsuleFilepath
 
+                        // Debug: Log snapshot structure to understand key resolution
+                        console.log('[DEBUG] buildCapsuleSnapshotForReference result:')
+                        console.log('  spineContractUri:', spineContractUri)
+                        console.log('  snapshot.spineContracts keys:', Object.keys(snapshot.spineContracts || {}))
+                        const contractData = snapshot.spineContracts?.[spineContractUri]
+                        console.log('  contractData keys:', Object.keys(contractData || {}))
+                        console.log('  capsuleName:', capsuleName)
+                        console.log('  projectedFilepath:', projectedFilepath)
+
                         if (capsuleName && projectedFilepath) {
                             allCapsuleUris.add(capsuleName)
 
