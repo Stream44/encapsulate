@@ -19,7 +19,12 @@ export class ContractCapsuleInstanceFactory {
     protected runtimeSpineContracts?: Record<string, any>
     protected capsuleInstance?: any
     public structInitFunctions: Array<() => any> = []
+    public structDisposeFunctions: Array<() => any> = []
+    public initFunctions: Array<() => any> = []
+    public disposeFunctions: Array<() => any> = []
     public mappedCapsuleInstances: Array<any> = []
+    protected memoizeCache: Map<string, any> = new Map()
+    protected memoizeTimeouts: Map<string, ReturnType<typeof setTimeout>> = new Map()
 
     constructor({ spineContractUri, capsule, self, ownSelf, encapsulatedApi, resolve, importCapsule, spineFilesystemRoot, freezeCapsule, instanceRegistry, extendedCapsuleInstance, runtimeSpineContracts, capsuleInstance }: { spineContractUri: string, capsule: any, self: any, ownSelf?: any, encapsulatedApi: Record<string, any>, resolve?: (uri: string, parentFilepath: string) => Promise<string>, importCapsule?: (filepath: string) => Promise<any>, spineFilesystemRoot?: string, freezeCapsule?: (capsule: any) => Promise<any>, instanceRegistry?: CapsuleInstanceRegistry, extendedCapsuleInstance?: any, runtimeSpineContracts?: Record<string, any>, capsuleInstance?: any }) {
         this.spineContractUri = spineContractUri
@@ -50,8 +55,16 @@ export class ContractCapsuleInstanceFactory {
             this.mapFunctionProperty({ property })
         } else if (property.definition.type === CapsulePropertyTypes.GetterFunction) {
             this.mapGetterFunctionProperty({ property })
+        } else if (property.definition.type === CapsulePropertyTypes.SetterFunction) {
+            this.mapSetterFunctionProperty({ property })
         } else if (property.definition.type === CapsulePropertyTypes.StructInit) {
             this.mapStructInitProperty({ property })
+        } else if (property.definition.type === CapsulePropertyTypes.StructDispose) {
+            this.mapStructDisposeProperty({ property })
+        } else if (property.definition.type === CapsulePropertyTypes.Init) {
+            this.mapInitProperty({ property })
+        } else if (property.definition.type === CapsulePropertyTypes.Dispose) {
+            this.mapDisposeProperty({ property })
         }
     }
 
@@ -321,18 +334,82 @@ export class ContractCapsuleInstanceFactory {
     protected mapFunctionProperty({ property }: { property: any }) {
         const apiTarget = this.getApiTarget({ property })
         const selfProxy = this.createSelfProxy()
-        apiTarget[property.name] = property.definition.value.bind(selfProxy)
+        const boundFunction = property.definition.value.bind(selfProxy)
+        const memoizeOption = property.definition.memoize
+        const shouldMemoize = memoizeOption === true || typeof memoizeOption === 'number'
+        const memoizeTtl = typeof memoizeOption === 'number' ? memoizeOption : null
+        const cacheKey = `function:${property.name}`
+
+        if (shouldMemoize) {
+            // Wrap the function to support memoization
+            apiTarget[property.name] = (...args: any[]) => {
+                if (this.memoizeCache.has(cacheKey)) {
+                    return this.memoizeCache.get(cacheKey)
+                }
+                const result = boundFunction(...args)
+                this.memoizeCache.set(cacheKey, result)
+
+                // Set up TTL expiration if specified
+                if (memoizeTtl !== null) {
+                    // Clear any existing timeout for this key
+                    if (this.memoizeTimeouts.has(cacheKey)) {
+                        clearTimeout(this.memoizeTimeouts.get(cacheKey))
+                    }
+                    const timeout = setTimeout(() => {
+                        this.memoizeCache.delete(cacheKey)
+                        this.memoizeTimeouts.delete(cacheKey)
+                    }, memoizeTtl)
+                    this.memoizeTimeouts.set(cacheKey, timeout)
+                }
+
+                return result
+            }
+        } else {
+            apiTarget[property.name] = boundFunction
+        }
     }
 
     protected mapGetterFunctionProperty({ property }: { property: any }) {
         const apiTarget = this.getApiTarget({ property })
         const getterFn = property.definition.value
         const selfProxy = this.createSelfProxy()
+        const memoizeOption = property.definition.memoize
+        const shouldMemoize = memoizeOption === true || typeof memoizeOption === 'number'
+        const memoizeTtl = typeof memoizeOption === 'number' ? memoizeOption : null
+        const cacheKey = `getter:${property.name}`
+
+        // Helper to set up TTL expiration
+        const setupTtlExpiration = () => {
+            if (memoizeTtl !== null) {
+                // Clear any existing timeout for this key
+                if (this.memoizeTimeouts.has(cacheKey)) {
+                    clearTimeout(this.memoizeTimeouts.get(cacheKey))
+                }
+                const timeout = setTimeout(() => {
+                    this.memoizeCache.delete(cacheKey)
+                    this.memoizeTimeouts.delete(cacheKey)
+                }, memoizeTtl)
+                this.memoizeTimeouts.set(cacheKey, timeout)
+            }
+        }
 
         // Define a lazy getter that calls the function only when accessed with proper this context
         Object.defineProperty(apiTarget, property.name, {
             get: () => {
-                return getterFn.call(selfProxy)
+                // Check memoize cache first
+                if (shouldMemoize && this.memoizeCache.has(cacheKey)) {
+                    return this.memoizeCache.get(cacheKey)
+                }
+
+                const result = getterFn.call(selfProxy)
+
+                // Store in memoize cache if memoize is enabled
+                if (shouldMemoize) {
+                    this.memoizeCache.set(cacheKey, result)
+                    setupTtlExpiration()
+                }
+
+                return result
             },
             enumerable: true,
             configurable: true
@@ -343,7 +420,42 @@ export class ContractCapsuleInstanceFactory {
         if (this.ownSelf) {
             Object.defineProperty(this.ownSelf, property.name, {
                 get: () => {
-                    return getterFn.call(selfProxy)
+                    // For ownSelf, also respect memoization
+                    if (shouldMemoize && this.memoizeCache.has(cacheKey)) {
+                        return this.memoizeCache.get(cacheKey)
+                    }
+                    const result = getterFn.call(selfProxy)
+                    if (shouldMemoize) {
+                        this.memoizeCache.set(cacheKey, result)
+                        setupTtlExpiration()
+                    }
+                    return result
+                },
+                enumerable: true,
+                configurable: true
+            })
+        }
+    }
+
+    protected mapSetterFunctionProperty({ property }: { property: any }) {
+        const apiTarget = this.getApiTarget({ property })
+        const setterFn = property.definition.value
+        const selfProxy = this.createSelfProxy()
+
+        // Define a setter that calls the function when the property is assigned
+        Object.defineProperty(apiTarget, property.name, {
+            set: (value: any) => {
+                setterFn.call(selfProxy, value)
+            },
+            enumerable: true,
+            configurable: true
+        })
+
+        // Also define the setter on ownSelf so this.self.propertyName = value works
+        if (this.ownSelf) {
+            Object.defineProperty(this.ownSelf, property.name, {
+                set: (value: any) => {
+                    setterFn.call(selfProxy, value)
                 },
                 enumerable: true,
                 configurable: true
@@ -357,8 +469,33 @@ export class ContractCapsuleInstanceFactory {
         this.structInitFunctions.push(boundFunction)
     }
 
+    protected mapStructDisposeProperty({ property }: { property: any }) {
+        const selfProxy = this.createSelfProxy()
+        const boundFunction = property.definition.value.bind(selfProxy)
+        this.structDisposeFunctions.push(boundFunction)
+    }
+
+    protected mapInitProperty({ property }: { property: any }) {
+        const selfProxy = this.createSelfProxy()
+        const boundFunction = property.definition.value.bind(selfProxy)
+        this.initFunctions.push(boundFunction)
+    }
+
+    protected mapDisposeProperty({ property }: { property: any }) {
+        const selfProxy = this.createSelfProxy()
+        const boundFunction = property.definition.value.bind(selfProxy)
+        this.disposeFunctions.push(boundFunction)
+    }
+
     async freeze(options: any): Promise<any> {
         return this.freezeCapsule?.(options) || {}
+    }
+
+    public clearMemoizeTimeouts() {
+        for (const timeout of this.memoizeTimeouts.values()) {
+            clearTimeout(timeout)
+        }
+        this.memoizeTimeouts.clear()
     }
 
 }

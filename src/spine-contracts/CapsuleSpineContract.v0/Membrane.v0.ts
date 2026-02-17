@@ -429,6 +429,25 @@ class MembraneContractCapsuleInstanceFactory extends ContractCapsuleInstanceFact
     protected mapFunctionProperty({ property }: { property: any }) {
         const selfProxy = this.createSelfProxy()
         const boundFunction = property.definition.value.bind(selfProxy)
+        const memoizeOption = property.definition.memoize
+        const shouldMemoize = memoizeOption === true || typeof memoizeOption === 'number'
+        const memoizeTtl = typeof memoizeOption === 'number' ? memoizeOption : null
+        const cacheKey = `function:${property.name}`
+
+        // Helper to set up TTL expiration
+        const setupTtlExpiration = () => {
+            if (memoizeTtl !== null) {
+                // Clear any existing timeout for this key
+                if (this.memoizeTimeouts.has(cacheKey)) {
+                    clearTimeout(this.memoizeTimeouts.get(cacheKey))
+                }
+                const timeout = setTimeout(() => {
+                    this.memoizeCache.delete(cacheKey)
+                    this.memoizeTimeouts.delete(cacheKey)
+                }, memoizeTtl)
+                this.memoizeTimeouts.set(cacheKey, timeout)
+            }
+        }
 
         const valueKey = `__value_${property.name}`
         Object.defineProperty(this.encapsulatedApi, valueKey, {
@@ -441,6 +460,48 @@ class MembraneContractCapsuleInstanceFactory extends ContractCapsuleInstanceFact
         Object.defineProperty(this.encapsulatedApi, property.name, {
             get: () => {
                 return (...args: any[]) => {
+                    // Check memoize cache first (only for no-arg calls or first call)
+                    if (shouldMemoize && this.memoizeCache.has(cacheKey)) {
+                        const cachedResult = this.memoizeCache.get(cacheKey)
+
+                        const callEvent: any = {
+                            event: 'call',
+                            eventIndex: this.incrementEventIndex(),
+                            target: {
+                                capsuleSourceLineRef: this.encapsulateOptions.capsuleSourceLineRef,
+                                spineContractCapsuleInstanceId: this.id,
+                                prop: property.name,
+                            },
+                            args,
+                            memoized: true
+                        }
+
+                        if (this.capsuleSourceNameRef) {
+                            callEvent.target.capsuleSourceNameRef = this.capsuleSourceNameRef
+                        }
+                        if (this.capsuleSourceNameRefHash) {
+                            callEvent.target.capsuleSourceNameRefHash = this.capsuleSourceNameRefHash
+                        }
+
+                        this.addCallerContextToEvent(callEvent)
+                        this.onMembraneEvent?.(callEvent)
+
+                        const resultEvent: any = {
+                            event: 'call-result',
+                            eventIndex: this.incrementEventIndex(),
+                            callEventIndex: callEvent.eventIndex,
+                            target: {
+                                spineContractCapsuleInstanceId: this.id,
+                            },
+                            result: cachedResult,
+                            memoized: true
+                        }
+
+                        this.onMembraneEvent?.(resultEvent)
+
+                        return cachedResult
+                    }
+
                     const callEvent: any = {
                         event: 'call',
                         eventIndex: this.incrementEventIndex(),
@@ -463,6 +524,12 @@ class MembraneContractCapsuleInstanceFactory extends ContractCapsuleInstanceFact
                     this.onMembraneEvent?.(callEvent)
 
                     const result = boundFunction(...args)
+
+                    // Store in memoize cache if memoize is enabled
+                    if (shouldMemoize) {
+                        this.memoizeCache.set(cacheKey, result)
+                        setupTtlExpiration()
+                    }
 
                     const resultEvent: any = {
                         event: 'call-result',
@@ -487,11 +554,64 @@ class MembraneContractCapsuleInstanceFactory extends ContractCapsuleInstanceFact
     protected mapGetterFunctionProperty({ property }: { property: any }) {
         const getterFn = property.definition.value
         const selfProxy = this.createSelfProxy()
+        const memoizeOption = property.definition.memoize
+        const shouldMemoize = memoizeOption === true || typeof memoizeOption === 'number'
+        const memoizeTtl = typeof memoizeOption === 'number' ? memoizeOption : null
+        const cacheKey = `getter:${property.name}`
+
+        // Helper to set up TTL expiration
+        const setupTtlExpiration = () => {
+            if (memoizeTtl !== null) {
+                // Clear any existing timeout for this key
+                if (this.memoizeTimeouts.has(cacheKey)) {
+                    clearTimeout(this.memoizeTimeouts.get(cacheKey))
+                }
+                const timeout = setTimeout(() => {
+                    this.memoizeCache.delete(cacheKey)
+                    this.memoizeTimeouts.delete(cacheKey)
+                }, memoizeTtl)
+                this.memoizeTimeouts.set(cacheKey, timeout)
+            }
+        }
 
         Object.defineProperty(this.encapsulatedApi, property.name, {
             get: () => {
+                // Check memoize cache first
+                if (shouldMemoize && this.memoizeCache.has(cacheKey)) {
+                    const cachedResult = this.memoizeCache.get(cacheKey)
+
+                    const event: any = {
+                        event: 'get',
+                        eventIndex: this.incrementEventIndex(),
+                        target: {
+                            capsuleSourceLineRef: this.encapsulateOptions.capsuleSourceLineRef,
+                            spineContractCapsuleInstanceId: this.id,
+                            prop: property.name,
+                        },
+                        value: cachedResult,
+                        memoized: true
+                    }
+
+                    if (this.capsuleSourceNameRef) {
+                        event.target.capsuleSourceNameRef = this.capsuleSourceNameRef
+                    }
+                    if (this.capsuleSourceNameRefHash) {
+                        event.target.capsuleSourceNameRefHash = this.capsuleSourceNameRefHash
+                    }
+
+                    this.addCallerContextToEvent(event)
+                    this.onMembraneEvent?.(event)
+                    return cachedResult
+                }
+
                 // Call the getter function lazily when accessed with proper this context
                 const result = getterFn.call(selfProxy)
+
+                // Store in memoize cache if memoize is enabled
+                if (shouldMemoize) {
+                    this.memoizeCache.set(cacheKey, result)
+                    setupTtlExpiration()
+                }
 
                 const event: any = {
                     event: 'get',
@@ -524,7 +644,16 @@ class MembraneContractCapsuleInstanceFactory extends ContractCapsuleInstanceFact
         if (this.ownSelf) {
             Object.defineProperty(this.ownSelf, property.name, {
                 get: () => {
-                    return getterFn.call(selfProxy)
+                    // For ownSelf, also respect memoization
+                    if (shouldMemoize && this.memoizeCache.has(cacheKey)) {
+                        return this.memoizeCache.get(cacheKey)
+                    }
+                    const result = getterFn.call(selfProxy)
+                    if (shouldMemoize) {
+                        this.memoizeCache.set(cacheKey, result)
+                        setupTtlExpiration()
+                    }
+                    return result
                 },
                 enumerable: true,
                 configurable: true

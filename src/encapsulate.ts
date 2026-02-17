@@ -103,11 +103,15 @@ type TSpineContext = {
 export const CapsulePropertyTypes = {
     Function: 'Function' as const,
     GetterFunction: 'GetterFunction' as const,
+    SetterFunction: 'SetterFunction' as const,
     String: 'String' as const,
     Mapping: 'Mapping' as const,
     Literal: 'Literal' as const,
     Constant: 'Constant' as const,
     StructInit: 'StructInit' as const,
+    StructDispose: 'StructDispose' as const,
+    Init: 'Init' as const,
+    Dispose: 'Dispose' as const,
 }
 
 // ##################################################
@@ -232,26 +236,57 @@ export async function SpineRuntime(options: TSpineRuntimeOptions): Promise<TSpin
                 }
             }
 
-            // Run StructInit functions for the entire capsule tree (top-down)
-            // Top-down means: child capsule's StructInit runs before extended parent's StructInit
+            // Run StructInit functions for struct capsules and Init functions for non-struct capsules
+            // StructInit: fires for struct-mapped capsules and any capsules they extend (top-down)
+            // Init: fires for non-struct capsules (those without StructInit)
             const structInitVisited = new Set<any>()
-            async function runStructInits(instance: any) {
+            const structInstances: any[] = []  // Track struct instances for StructDispose
+            const nonStructInstances: any[] = []  // Track non-struct instances for Dispose
+
+            async function runStructInits(instance: any, isStructContext: boolean = false) {
                 if (!instance || structInitVisited.has(instance)) return
                 structInitVisited.add(instance)
 
-                // Run this capsule's own StructInit functions first (top-down)
-                if (instance.structInitFunctions?.length) {
-                    for (const fn of instance.structInitFunctions) {
-                        await fn()
+                // Determine if this instance is a struct capsule (has StructInit functions)
+                const hasStructInit = instance.structInitFunctions?.length > 0
+                const isStruct = hasStructInit || isStructContext
+
+                if (isStruct) {
+                    // This is a struct capsule - run StructInit
+                    structInstances.push(instance)
+                    if (instance.structInitFunctions?.length) {
+                        for (const fn of instance.structInitFunctions) {
+                            await fn()
+                        }
+                        // Sync self values back to encapsulatedApi for spine contracts that use
+                        // direct assignment (e.g. Static contract) rather than getters
+                        if (instance.spineContractCapsuleInstances) {
+                            for (const sci of Object.values(instance.spineContractCapsuleInstances) as any[]) {
+                                if (sci.self && sci.encapsulatedApi) {
+                                    for (const key of Object.keys(sci.encapsulatedApi)) {
+                                        if (key in sci.self && sci.encapsulatedApi[key] !== sci.self[key]) {
+                                            sci.encapsulatedApi[key] = sci.self[key]
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     }
-                    // Sync self values back to encapsulatedApi for spine contracts that use
-                    // direct assignment (e.g. Static contract) rather than getters
-                    if (instance.spineContractCapsuleInstances) {
-                        for (const sci of Object.values(instance.spineContractCapsuleInstances) as any[]) {
-                            if (sci.self && sci.encapsulatedApi) {
-                                for (const key of Object.keys(sci.encapsulatedApi)) {
-                                    if (key in sci.self && sci.encapsulatedApi[key] !== sci.self[key]) {
-                                        sci.encapsulatedApi[key] = sci.self[key]
+                } else {
+                    // This is a non-struct capsule - run Init
+                    nonStructInstances.push(instance)
+                    if (instance.initFunctions?.length) {
+                        for (const fn of instance.initFunctions) {
+                            await fn()
+                        }
+                        // Sync self values back to encapsulatedApi
+                        if (instance.spineContractCapsuleInstances) {
+                            for (const sci of Object.values(instance.spineContractCapsuleInstances) as any[]) {
+                                if (sci.self && sci.encapsulatedApi) {
+                                    for (const key of Object.keys(sci.encapsulatedApi)) {
+                                        if (key in sci.self && sci.encapsulatedApi[key] !== sci.self[key]) {
+                                            sci.encapsulatedApi[key] = sci.self[key]
+                                        }
                                     }
                                 }
                             }
@@ -259,15 +294,15 @@ export async function SpineRuntime(options: TSpineRuntimeOptions): Promise<TSpin
                     }
                 }
 
-                // Recurse into extended capsule instance
+                // Recurse into extended capsule instance (inherits struct context)
                 if (instance.extendedCapsuleInstance) {
-                    await runStructInits(instance.extendedCapsuleInstance)
+                    await runStructInits(instance.extendedCapsuleInstance, isStruct)
                 }
 
-                // Recurse into mapped capsule instances
+                // Recurse into mapped capsule instances (each determines its own struct status)
                 if (instance.mappedCapsuleInstances?.length) {
                     for (const mappedInstance of instance.mappedCapsuleInstances) {
-                        await runStructInits(mappedInstance)
+                        await runStructInits(mappedInstance, false)
                     }
                 }
             }
@@ -277,6 +312,38 @@ export async function SpineRuntime(options: TSpineRuntimeOptions): Promise<TSpin
             }
 
             const result = await handler({ apis, capsules })
+
+            // Run StructDispose for struct capsules (reverse order - bottom-up)
+            for (let i = structInstances.length - 1; i >= 0; i--) {
+                const instance = structInstances[i]
+                if (instance.structDisposeFunctions?.length) {
+                    for (const fn of instance.structDisposeFunctions) {
+                        await fn()
+                    }
+                }
+            }
+
+            // Run Dispose for non-struct capsules (reverse order - bottom-up)
+            for (let i = nonStructInstances.length - 1; i >= 0; i--) {
+                const instance = nonStructInstances[i]
+                if (instance.disposeFunctions?.length) {
+                    for (const fn of instance.disposeFunctions) {
+                        await fn()
+                    }
+                }
+            }
+
+            // Clear all memoize timeouts to prevent memory leaks
+            for (const [, entry] of Object.entries(capsules)) {
+                const instance = (entry as any).instance
+                if (instance?.spineContractCapsuleInstances) {
+                    for (const sci of Object.values(instance.spineContractCapsuleInstances) as any[]) {
+                        if (typeof sci.clearMemoizeTimeouts === 'function') {
+                            sci.clearMemoizeTimeouts()
+                        }
+                    }
+                }
+            }
 
             return result
         },
@@ -750,6 +817,9 @@ async function encapsulate(definition: TCapsuleDefinition, options: TCapsuleOpti
                     spineContractCapsuleInstances,
                     extendedCapsuleInstance,
                     structInitFunctions: [] as Array<() => any>,
+                    structDisposeFunctions: [] as Array<() => any>,
+                    initFunctions: [] as Array<() => any>,
+                    disposeFunctions: [] as Array<() => any>,
                     mappedCapsuleInstances: [] as Array<any>,
                     rootCapsule: resolvedRootCapsule
                 }
@@ -809,11 +879,20 @@ async function encapsulate(definition: TCapsuleDefinition, options: TCapsuleOpti
                 }
                 ownSelf['#@stream44.studio/encapsulate/structs/Capsule'] = capsuleMetadataStruct
 
-                // Collect StructInit functions and mapped capsule instances from all spine contract capsule instances
+                // Collect lifecycle functions and mapped capsule instances from all spine contract capsule instances
                 for (const spineContractCapsuleInstance of Object.values(spineContractCapsuleInstances)) {
                     const sci = spineContractCapsuleInstance as any
                     if (sci.structInitFunctions?.length) {
                         capsuleInstance.structInitFunctions.push(...sci.structInitFunctions)
+                    }
+                    if (sci.structDisposeFunctions?.length) {
+                        capsuleInstance.structDisposeFunctions.push(...sci.structDisposeFunctions)
+                    }
+                    if (sci.initFunctions?.length) {
+                        capsuleInstance.initFunctions.push(...sci.initFunctions)
+                    }
+                    if (sci.disposeFunctions?.length) {
+                        capsuleInstance.disposeFunctions.push(...sci.disposeFunctions)
                     }
                     if (sci.mappedCapsuleInstances?.length) {
                         capsuleInstance.mappedCapsuleInstances.push(...sci.mappedCapsuleInstances)
@@ -953,7 +1032,10 @@ function relative(from: string, to: string): string {
 }
 
 function isObject(item: any): boolean {
-    return item && typeof item === 'object' && !Array.isArray(item)
+    if (!item || typeof item !== 'object' || Array.isArray(item)) return false
+    // Only deep-merge plain objects — preserve instances like Map, Set, Date, etc.
+    const proto = Object.getPrototypeOf(item)
+    return proto === Object.prototype || proto === null
 }
 
 export function merge<T = any>(target: T, ...sources: any[]): T {

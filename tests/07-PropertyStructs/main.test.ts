@@ -939,3 +939,334 @@ it('Static: StructInit runs for mapped capsules in the tree', async function () 
         expect(rootApi.mapped.leafInitDone).toBe(true)
     })
 })
+
+
+// ##################################################
+// # StructDispose Tests
+// ##################################################
+
+it('StructDispose runs after handler completes', async function () {
+
+    const { encapsulate, freeze, CapsulePropertyTypes, makeImportStack, hoistSnapshot } = await CapsuleSpineFactory({
+        spineFilesystemRoot: join(import.meta.dir, '../../../../..'),
+        capsuleModuleProjectionRoot: import.meta.dir,
+        enableCallerStackInference: true,
+        spineContracts: {
+            ['#' + CapsuleSpineContract['#']]: CapsuleSpineContract
+        }
+    })
+
+    const capsule1 = await encapsulate({
+        '#@stream44.studio/encapsulate/spine-contracts/CapsuleSpineContract.v0': {
+            '#@stream44.studio/encapsulate/structs/Capsule': {},
+            '#': {
+                name: {
+                    type: CapsulePropertyTypes.Literal,
+                    value: 'capsule1'
+                },
+                initDone: {
+                    type: CapsulePropertyTypes.Literal,
+                    value: false
+                },
+                disposeDone: {
+                    type: CapsulePropertyTypes.Literal,
+                    value: false
+                },
+                structInit: {
+                    type: CapsulePropertyTypes.StructInit,
+                    value: function (this: any) {
+                        this.initDone = true
+                    }
+                },
+                structDispose: {
+                    type: CapsulePropertyTypes.StructDispose,
+                    value: function (this: any) {
+                        this.disposeDone = true
+                    }
+                }
+            }
+        }
+    }, {
+        importMeta: import.meta,
+        importStack: makeImportStack(),
+        capsuleName: 'structDisposeCapsule1'
+    })
+
+    const { run } = await hoistSnapshot({
+        snapshot: await freeze()
+    })
+
+    let initDoneInHandler = false
+    let disposeDoneInHandler = false
+    await run({}, async ({ apis }) => {
+        const api = apis[capsule1.capsuleSourceLineRef]
+        initDoneInHandler = api.initDone
+        disposeDoneInHandler = api.disposeDone
+    })
+
+    expect(initDoneInHandler).toBe(true)
+    expect(disposeDoneInHandler).toBe(false)
+})
+
+
+it('StructDispose runs in reverse order (bottom-up)', async function () {
+
+    const { encapsulate, freeze, CapsulePropertyTypes, makeImportStack, hoistSnapshot } = await CapsuleSpineFactory({
+        spineFilesystemRoot: join(import.meta.dir, '../../../../..'),
+        capsuleModuleProjectionRoot: import.meta.dir,
+        enableCallerStackInference: true,
+        spineContracts: {
+            ['#' + CapsuleSpineContract['#']]: CapsuleSpineContract
+        }
+    })
+
+    const leafCapsule = await encapsulate({
+        '#@stream44.studio/encapsulate/spine-contracts/CapsuleSpineContract.v0': {
+            '#@stream44.studio/encapsulate/structs/Capsule': {},
+            '#': {
+                name: {
+                    type: CapsulePropertyTypes.Literal,
+                    value: 'leaf'
+                },
+                leafInitDone: {
+                    type: CapsulePropertyTypes.Literal,
+                    value: false
+                },
+                leafDisposeDone: {
+                    type: CapsulePropertyTypes.Literal,
+                    value: false
+                },
+                structInit: {
+                    type: CapsulePropertyTypes.StructInit,
+                    value: function (this: any) {
+                        this.leafInitDone = true
+                    }
+                },
+                structDispose: {
+                    type: CapsulePropertyTypes.StructDispose,
+                    value: function (this: any) {
+                        this.leafDisposeDone = true
+                    }
+                }
+            }
+        }
+    }, {
+        importMeta: import.meta,
+        importStack: makeImportStack(),
+        capsuleName: 'structDisposeLeaf'
+    })
+
+    const rootCapsule = await encapsulate({
+        '#@stream44.studio/encapsulate/spine-contracts/CapsuleSpineContract.v0': {
+            '#@stream44.studio/encapsulate/structs/Capsule': {},
+            '#': {
+                name: {
+                    type: CapsulePropertyTypes.Literal,
+                    value: 'root'
+                },
+                rootInitDone: {
+                    type: CapsulePropertyTypes.Literal,
+                    value: false
+                },
+                rootDisposeDone: {
+                    type: CapsulePropertyTypes.Literal,
+                    value: false
+                },
+                structInit: {
+                    type: CapsulePropertyTypes.StructInit,
+                    value: function (this: any) {
+                        this.rootInitDone = true
+                    }
+                },
+                structDispose: {
+                    type: CapsulePropertyTypes.StructDispose,
+                    value: function (this: any) {
+                        this.rootDisposeDone = true
+                    }
+                },
+                mapped: {
+                    type: CapsulePropertyTypes.Mapping,
+                    value: leafCapsule
+                }
+            }
+        }
+    }, {
+        importMeta: import.meta,
+        importStack: makeImportStack(),
+        capsuleName: 'structDisposeRoot',
+        ambientReferences: { leafCapsule }
+    })
+
+    const { run } = await hoistSnapshot({
+        snapshot: await freeze()
+    })
+
+    let rootInitInHandler = false
+    let leafInitInHandler = false
+    let rootDisposeInHandler = false
+    let leafDisposeInHandler = false
+    await run({}, async ({ apis }) => {
+        rootInitInHandler = apis[rootCapsule.capsuleSourceLineRef].rootInitDone
+        leafInitInHandler = apis[rootCapsule.capsuleSourceLineRef].mapped.leafInitDone
+        rootDisposeInHandler = apis[rootCapsule.capsuleSourceLineRef].rootDisposeDone
+        leafDisposeInHandler = apis[rootCapsule.capsuleSourceLineRef].mapped.leafDisposeDone
+    })
+
+    // Inits should have run, disposes should not have run yet during handler
+    expect(rootInitInHandler).toBe(true)
+    expect(leafInitInHandler).toBe(true)
+    expect(rootDisposeInHandler).toBe(false)
+    expect(leafDisposeInHandler).toBe(false)
+})
+
+
+it('StructDispose async function support', async function () {
+
+    const { encapsulate, freeze, CapsulePropertyTypes, makeImportStack, hoistSnapshot } = await CapsuleSpineFactory({
+        spineFilesystemRoot: join(import.meta.dir, '../../../../..'),
+        capsuleModuleProjectionRoot: import.meta.dir,
+        enableCallerStackInference: true,
+        spineContracts: {
+            ['#' + CapsuleSpineContract['#']]: CapsuleSpineContract
+        }
+    })
+
+    const capsule1 = await encapsulate({
+        '#@stream44.studio/encapsulate/spine-contracts/CapsuleSpineContract.v0': {
+            '#@stream44.studio/encapsulate/structs/Capsule': {},
+            '#': {
+                name: {
+                    type: CapsulePropertyTypes.Literal,
+                    value: 'asyncDispose'
+                },
+                asyncInitDone: {
+                    type: CapsulePropertyTypes.Literal,
+                    value: false
+                },
+                asyncDisposeDone: {
+                    type: CapsulePropertyTypes.Literal,
+                    value: false
+                },
+                structInit: {
+                    type: CapsulePropertyTypes.StructInit,
+                    value: async function (this: any) {
+                        this.asyncInitDone = true
+                    }
+                },
+                structDispose: {
+                    type: CapsulePropertyTypes.StructDispose,
+                    value: async function (this: any) {
+                        this.asyncDisposeDone = true
+                    }
+                }
+            }
+        }
+    }, {
+        importMeta: import.meta,
+        importStack: makeImportStack(),
+        capsuleName: 'asyncStructDisposeCapsule'
+    })
+
+    const { run } = await hoistSnapshot({
+        snapshot: await freeze()
+    })
+
+    let initDoneInHandler = false
+    let disposeDoneInHandler = false
+    await run({}, async ({ apis }) => {
+        initDoneInHandler = apis[capsule1.capsuleSourceLineRef].asyncInitDone
+        disposeDoneInHandler = apis[capsule1.capsuleSourceLineRef].asyncDisposeDone
+    })
+
+    expect(initDoneInHandler).toBe(true)
+    expect(disposeDoneInHandler).toBe(false)
+})
+
+
+it('StructDispose property should NOT be on the API', async function () {
+
+    const { encapsulate, freeze, CapsulePropertyTypes, makeImportStack, hoistSnapshot } = await CapsuleSpineFactory({
+        spineFilesystemRoot: join(import.meta.dir, '../../../../..'),
+        capsuleModuleProjectionRoot: import.meta.dir,
+        enableCallerStackInference: true,
+        spineContracts: {
+            ['#' + CapsuleSpineContract['#']]: CapsuleSpineContract
+        }
+    })
+
+    const capsule1 = await encapsulate({
+        '#@stream44.studio/encapsulate/spine-contracts/CapsuleSpineContract.v0': {
+            '#@stream44.studio/encapsulate/structs/Capsule': {},
+            '#': {
+                name: {
+                    type: CapsulePropertyTypes.Literal,
+                    value: 'test'
+                },
+                structInit: {
+                    type: CapsulePropertyTypes.StructInit,
+                    value: function (this: any) { }
+                },
+                structDispose: {
+                    type: CapsulePropertyTypes.StructDispose,
+                    value: function (this: any) { }
+                }
+            }
+        }
+    }, {
+        importMeta: import.meta,
+        importStack: makeImportStack(),
+        capsuleName: 'structDisposeNotOnApi'
+    })
+
+    const { run } = await hoistSnapshot({
+        snapshot: await freeze()
+    })
+
+    await run({}, async ({ apis }) => {
+        const api = apis[capsule1.capsuleSourceLineRef]
+        expect('structInit' in api).toBe(false)
+        expect('structDispose' in api).toBe(false)
+    })
+})
+
+
+it('StructInit and StructDispose fire for extended capsules in struct context', async function () {
+
+    const { encapsulate, freeze, CapsulePropertyTypes, makeImportStack, hoistSnapshot } = await CapsuleSpineFactory({
+        spineFilesystemRoot: join(import.meta.dir, '../../../../..'),
+        capsuleModuleProjectionRoot: import.meta.dir,
+        enableCallerStackInference: true,
+        spineContracts: {
+            ['#' + CapsuleSpineContract['#']]: CapsuleSpineContract
+        }
+    })
+
+    // Root capsule that maps the child (which extends parent via file-based capsules)
+    // This test uses the existing InitChild.v0 and InitParent.v0 capsules
+    const rootCapsule = await encapsulate({
+        '#@stream44.studio/encapsulate/spine-contracts/CapsuleSpineContract.v0': {
+            '#@stream44.studio/encapsulate/structs/Capsule': {},
+            '#': {
+                child: {
+                    type: CapsulePropertyTypes.Mapping,
+                    value: './caps/InitChild.v0'
+                }
+            }
+        }
+    }, {
+        importMeta: import.meta,
+        importStack: makeImportStack(),
+        capsuleName: 'structDisposeExtendedRoot'
+    })
+
+    const { run } = await hoistSnapshot({
+        snapshot: await freeze()
+    })
+
+    await run({}, async ({ apis }) => {
+        const childApi = apis[rootCapsule.capsuleSourceLineRef].child
+        // Top-down: child's StructInit runs before parent's StructInit
+        // Both share the same 'this' (sharedSelf), so initOrder tracks the order
+        expect(childApi.initOrder).toBe('child,parent')
+    })
+})
