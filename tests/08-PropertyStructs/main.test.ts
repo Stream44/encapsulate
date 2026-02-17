@@ -173,13 +173,14 @@ it('Membrane construction & execution', async function () {
         ])
     })
 
+    const capsule1Hash = capsule1.cst.capsuleSourceNameRefHash
     expect(result as any).toEqual([
         'World',
         '[global] Hello (capsule1): World',
         '[global] Hello (capsule1): World',
         '[global] Hello (capsule1): World',
-        '33ef2e9143c47fb44aae8f7c55a210cc',
-        '33ef2e9143c47fb44aae8f7c55a210cc',
+        capsule1Hash,
+        capsule1Hash,
         'Sun',
         'Hello (capsule2): Sun [mappedCapsule.hello: [realm:Admin] Hello (capsule1): World]',
         'Hello (capsule2): Sun',
@@ -188,8 +189,8 @@ it('Membrane construction & execution', async function () {
         '[realm:Admin] Hello (capsule1): World',
         '[realm:Admin] Hello (capsule1): World',
         '[realm:Admin] Hello (capsule1): World',
-        '33ef2e9143c47fb44aae8f7c55a210cc',
-        '33ef2e9143c47fb44aae8f7c55a210cc'
+        capsule1Hash,
+        capsule1Hash
     ])
 
     expect(membraneEvents.length).toBeGreaterThan(0)
@@ -197,7 +198,7 @@ it('Membrane construction & execution', async function () {
     expect(membraneEvents[0].target.prop).toBe('username')
     expect(membraneEvents[0].target.capsuleSourceLineRef).toMatch(/main\.test\.ts:69$/)
     expect(membraneEvents[0].target.capsuleSourceNameRef).toMatch(/main\.test\.ts:capsule1$/)
-    expect(membraneEvents[0].target.capsuleSourceNameRefHash).toBe('33ef2e9143c47fb44aae8f7c55a210cc')
+    expect(membraneEvents[0].target.capsuleSourceNameRefHash).toBe(capsule1Hash)
     expect(membraneEvents[0].value).toBe('World')
 
     const callEvents = membraneEvents.filter((e: any) => e.event === 'call')

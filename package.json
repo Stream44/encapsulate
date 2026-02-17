@@ -17,7 +17,8 @@
         "./structs/Capsule": "./structs/Capsule.ts"
     },
     "scripts": {
-        "test": "bun test"
+        "test": "bun test",
+        "test:docker": "./scripts/test-docker.sh"
     },
     "dependencies": {
         "typescript": "^5.9.3",
