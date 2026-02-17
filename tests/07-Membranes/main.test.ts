@@ -182,5 +182,19 @@ it('Membrane construction & execution', async function () {
         '[realm:Admin] Hello (capsule1): World',
     ])
 
-    expect(JSON.parse(JSON.stringify(membraneEvents))).toMatchSnapshot()
+    expect(membraneEvents.length).toBeGreaterThan(0)
+    expect(membraneEvents[0].event).toBe('get')
+    expect(membraneEvents[0].target.prop).toBe('username')
+    expect(membraneEvents[0].target.capsuleSourceLineRef).toMatch(/main\.test\.ts:67$/)
+    expect(membraneEvents[0].target.capsuleSourceNameRef).toMatch(/main\.test\.ts:capsule1$/)
+    expect(membraneEvents[0].target.capsuleSourceNameRefHash).toBeTruthy()
+    expect(membraneEvents[0].value).toBe('World')
+
+    const callEvents = membraneEvents.filter((e: any) => e.event === 'call')
+    expect(callEvents.length).toBeGreaterThan(0)
+    expect(callEvents[0].target.prop).toBe('hello')
+
+    const callResultEvents = membraneEvents.filter((e: any) => e.event === 'call-result')
+    expect(callResultEvents.length).toBeGreaterThan(0)
+    expect(callResultEvents[0].result).toBe('[global] Hello (capsule1): World')
 })

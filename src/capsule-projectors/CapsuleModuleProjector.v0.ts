@@ -457,24 +457,22 @@ export function CapsuleModuleProjector({
         if (capsule.cst.source.capsuleName) {
             // Use capsuleName as the path - NO line number
             let capsuleNamePath = capsule.cst.source.capsuleName
-            // Strip @ prefix
             if (capsuleNamePath.startsWith('@')) {
                 capsuleNamePath = capsuleNamePath.substring(1)
             }
             // Just capsuleName + extension, NO line number
-            projectedPath = `.~caps/${capsuleNamePath}${sourceExtension}`
+            projectedPath = `.~o/encapsulate.dev/caps/${capsuleNamePath}${sourceExtension}`
         } else if (capsule.cst.capsuleSourceUriLineRef) {
             // Use capsuleSourceUriLineRef which already has format: uri:line
             let uriPath = capsule.cst.capsuleSourceUriLineRef
-            // Strip @ prefix
             if (uriPath.startsWith('@')) {
                 uriPath = uriPath.substring(1)
             }
             // Add extension after the line number: uri:line.ext
-            projectedPath = `.~caps/${uriPath}${sourceExtension}`
+            projectedPath = `.~o/encapsulate.dev/caps/${uriPath}${sourceExtension}`
         } else {
             // Fallback to hash if neither exists
-            projectedPath = `.~caps/${capsule.cst.capsuleSourceNameRefHash.substring(0, 8)}${sourceExtension}`
+            projectedPath = `.~o/encapsulate.dev/caps/${capsule.cst.capsuleSourceNameRefHash.substring(0, 8)}${sourceExtension}`
         }
 
         return {
@@ -834,8 +832,8 @@ export function CapsuleModuleProjector({
 
                             // Build import path from projected filepath
                             const importName = `_capsule_${capsuleName.replace(/[^a-zA-Z0-9]/g, '_')}`
-                            // Remove .~caps/ prefix and strip extension
-                            const importPath = projectedFilepath.replace(/^\.~caps\//, '').replace(/\.(ts|tsx)$/, '')
+                            // Remove .~o/encapsulate.dev/caps/ prefix and strip extension
+                            const importPath = projectedFilepath.replace(/^\.~o\/encapsulate\.dev\/caps\//, '').replace(/\.(ts|tsx)$/, '')
 
                             capsuleDeps.push({ uri: capsuleName, importName, importPath })
                         }
@@ -843,13 +841,13 @@ export function CapsuleModuleProjector({
                 }
 
                 // Generate static imports for all capsule dependencies
-                // Compute relative path from projected file to .~caps directory
+                // Compute relative path from projected file to caps directory
                 let importPrefix: string
                 if (capsuleModuleProjectionPackage) {
                     importPrefix = capsuleModuleProjectionPackage
                 } else {
                     const projectedFileDir = dirname(filepath)
-                    const capsDir = '.~caps'
+                    const capsDir = '.~o/encapsulate.dev/caps'
                     const relativePathToCaps = relative(projectedFileDir, capsDir)
                     importPrefix = relativePathToCaps.startsWith('.') ? relativePathToCaps : './' + relativePathToCaps
                 }
@@ -1012,8 +1010,8 @@ export default function({ onMembraneEvent }: { onMembraneEvent?: (event: any) =>
                     if (projectedFilepath) {
                         // Build import path from projected filepath
                         const importName = `_capsule_${uri.replace(/[^a-zA-Z0-9]/g, '_')}`
-                        // Remove .~caps/ prefix and strip extension
-                        const importPath = projectedFilepath.replace(/^\.~caps\//, '').replace(/\.(ts|tsx)$/, '')
+                        // Remove .~o/encapsulate.dev/caps/ prefix and strip extension
+                        const importPath = projectedFilepath.replace(/^\.~o\/encapsulate\.dev\/caps\//, '').replace(/\.(ts|tsx)$/, '')
 
                         capsuleDeps.push({ uri, importName, importPath })
                     }
@@ -1021,13 +1019,13 @@ export default function({ onMembraneEvent }: { onMembraneEvent?: (event: any) =>
             }
 
             // Generate static imports for all capsule dependencies
-            // Compute relative path from projected file to .~caps directory
+            // Compute relative path from projected file to caps directory
             let importPrefix: string
             if (capsuleModuleProjectionPackage) {
                 importPrefix = capsuleModuleProjectionPackage
             } else {
                 const projectedFileDir = dirname(filepath)
-                const capsDir = '.~caps'
+                const capsDir = '.~o/encapsulate.dev/caps'
                 const relativePathToCaps = relative(projectedFileDir, capsDir)
                 importPrefix = relativePathToCaps.startsWith('.') ? relativePathToCaps : './' + relativePathToCaps
             }
@@ -1332,19 +1330,19 @@ ${defaultExport}
                     const mappedCapsuleDeps: Array<{ uri: string, importName: string, importPath: string }> = []
                     for (const uri of allMappedCapsuleUris) {
                         const importName = `_capsule_${uri.replace(/[^a-zA-Z0-9]/g, '_')}`
-                        // Strip leading @ from URI to avoid double @ in import paths
+                        // Strip leading @ to match caps filesystem paths
                         const importPath = uri.startsWith('@') ? uri.substring(1) : uri
                         mappedCapsuleDeps.push({ uri, importName, importPath })
                     }
 
                     // Generate static imports for all capsule dependencies
-                    // Compute relative path from projected file to .~caps directory
+                    // Compute relative path from projected file to caps directory
                     let importPrefix: string
                     if (capsuleModuleProjectionPackage) {
                         importPrefix = capsuleModuleProjectionPackage
                     } else {
                         const projectedFileDir = dirname(mapped.projectionPath)
-                        const capsDir = '.~caps'
+                        const capsDir = '.~o/encapsulate.dev/caps'
                         const relativePathToCaps = relative(projectedFileDir, capsDir)
                         importPrefix = relativePathToCaps.startsWith('.') ? relativePathToCaps : './' + relativePathToCaps
                     }
@@ -1486,19 +1484,19 @@ export default function({ onMembraneEvent }: { onMembraneEvent?: (event: any) =>
                 const mappedCapsuleDeps: Array<{ uri: string, importName: string, importPath: string }> = []
                 for (const uri of allMappedCapsuleUris) {
                     const importName = `_capsule_${uri.replace(/[^a-zA-Z0-9]/g, '_')}`
-                    // Strip leading @ from URI to avoid double @ in import paths
+                    // Strip leading @ to match caps filesystem paths
                     const importPath = uri.startsWith('@') ? uri.substring(1) : uri
                     mappedCapsuleDeps.push({ uri, importName, importPath })
                 }
 
                 // Generate static imports for all capsule dependencies
-                // Compute relative path from projected file to .~caps directory
+                // Compute relative path from projected file to caps directory
                 let importPrefix: string
                 if (capsuleModuleProjectionPackage) {
                     importPrefix = capsuleModuleProjectionPackage
                 } else {
                     const projectedFileDir = dirname(mapped.projectionPath)
-                    const capsDir = '.~caps'
+                    const capsDir = '.~o/encapsulate.dev/caps'
                     const relativePathToCaps = relative(projectedFileDir, capsDir)
                     importPrefix = relativePathToCaps.startsWith('.') ? relativePathToCaps : './' + relativePathToCaps
                 }
@@ -1628,7 +1626,7 @@ ${mappedDefaultExport}
             }
         }
 
-        // Write projection cache AND project ALL capsules in the registry to .~caps
+        // Write projection cache AND project ALL capsules in the registry to .~o/encapsulate.dev/caps
         // This includes struct definitions, property contract capsules, and any other capsules
         if (projectionCacheStore?.writeFile && capsules) {
             for (const [capsuleKey, registryCapsule] of Object.entries(capsules)) {
@@ -1655,7 +1653,7 @@ ${mappedDefaultExport}
                     }
                     await projectionCacheStore.writeFile(capsuleCacheFilename, JSON.stringify(capsuleCacheData, null, 2))
 
-                    // Also project the capsule to .~caps
+                    // Also project the capsule to .~o/encapsulate.dev/caps
                     const projectedPath = capsuleCacheData.snapshotData.spineContracts[spineContractUri]['#@stream44.studio/encapsulate/structs/Capsule'].projectedCapsuleFilepath
 
                     // Generate the capsule file content with proper imports and ambient reference loading

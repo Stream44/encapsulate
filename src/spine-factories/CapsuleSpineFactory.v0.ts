@@ -499,7 +499,7 @@ export async function CapsuleSpineFactory({
 
     timing?.recordMajor('CAPSULE SPINE FACTORY: READY')
 
-    const loadCapsule = async ({ capsuleSnapshot }: { capsuleSourceLineRef: string, capsuleSnapshot: any }) => {
+    const loadCapsule = async ({ capsuleSnapshot, cacheBustVersion }: { capsuleSourceLineRef: string, capsuleSnapshot: any, cacheBustVersion?: number }) => {
 
         if (!capsuleModuleProjectionRoot) {
             throw new Error('capsuleModuleProjectionRoot must be provided to enable dynamic loading of capsules')
@@ -508,6 +508,11 @@ export async function CapsuleSpineFactory({
         let filepath = capsuleSnapshot.spineContracts?.['#@stream44.studio/encapsulate/spine-contracts/CapsuleSpineContract.v0']?.['#@stream44.studio/encapsulate/structs/Capsule']?.projectedCapsuleFilepath
 
         if (!filepath) throw new Error(`Cannot load capsule. No 'filepath' found at 'spineContracts["#@stream44.studio/encapsulate/spine-contracts/CapsuleSpineContract.v0"]["#@stream44.studio/encapsulate/structs/Capsule"].projectedCapsuleFilepath'!`)
+
+        // Check cache bust version - if it doesn't match, return null to trigger regeneration
+        if (cacheBustVersion !== undefined && capsuleSnapshot.cst?.cacheBustVersion !== cacheBustVersion) {
+            return null
+        }
 
         const { capsule } = await import(join(capsuleModuleProjectionRoot, filepath))
 
@@ -529,6 +534,7 @@ export async function CapsuleSpineFactory({
 
             const result = await SpineRuntime({
                 snapshot,
+                spineFilesystemRoot,
                 spineContracts: spineContractInstances.runtime,
                 loadCapsule
             })

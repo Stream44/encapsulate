@@ -5,6 +5,7 @@ import { CapsuleSpineFactory } from "../../src/spine-factories/CapsuleSpineFacto
 
 import { SpineRuntime } from "../../src/encapsulate"
 import { CapsuleSpineContract } from "../../src/spine-contracts/CapsuleSpineContract.v0/Static.v0"
+import { CapsuleSpineContract as MembraneCapsuleSpineContract } from "../../src/spine-contracts/CapsuleSpineContract.v0/Membrane.v0"
 
 
 describe('Snapshot construction & execution with capsule projection', async function () {
@@ -35,6 +36,10 @@ describe('Snapshot construction & execution with capsule projection', async func
             '#@stream44.studio/encapsulate/spine-contracts/CapsuleSpineContract.v0': {
                 '#@stream44.studio/encapsulate/structs/Capsule': {},
                 '#': {
+                    PREFIX: {
+                        type: CapsulePropertyTypes.Constant,
+                        value: '[SNAP]'
+                    },
                     realm: {
                         type: CapsulePropertyTypes.Literal,
                         value: undefined
@@ -47,25 +52,30 @@ describe('Snapshot construction & execution with capsule projection', async func
                         type: CapsulePropertyTypes.String,
                         value: undefined
                     },
+                    getCapsuleMeta: {
+                        type: CapsulePropertyTypes.Function,
+                        value: function (this: any) {
+                            return this['#@stream44.studio/encapsulate/structs/Capsule']
+                        }
+                    },
                     hello: {
                         type: CapsulePropertyTypes.Function,
                         value: function (this: any): string {
-
-                            return `[${prefix}][${this.realm}] Hello (capsule1): ${this.username}`
+                            return `${this.PREFIX}[${prefix}][${this.realm}] Hello (capsule1): ${this.username}`
                         }
                     },
                     helloGetter1: {
                         type: CapsulePropertyTypes.GetterFunction,
                         value: function (this: any): string {
 
-                            return `[${prefix}][${this.realm}] Hello (capsule1): ${this.username}`
+                            return `${this.PREFIX}[${prefix}][${this.realm}] Hello (capsule1): ${this.username}`
                         }
                     },
                     helloGetter2: {
                         type: CapsulePropertyTypes.GetterFunction,
                         value: async function (this: any): Promise<string> {
 
-                            return `[${prefix}][${this.realm}] Hello (capsule1): ${this.username}`
+                            return `${this.PREFIX}[${prefix}][${this.realm}] Hello (capsule1): ${this.username}`
                         }
                     }
                 }
@@ -83,6 +93,10 @@ describe('Snapshot construction & execution with capsule projection', async func
             '#@stream44.studio/encapsulate/spine-contracts/CapsuleSpineContract.v0': {
                 '#@stream44.studio/encapsulate/structs/Capsule': {},
                 '#': {
+                    PREFIX: {
+                        type: CapsulePropertyTypes.Constant,
+                        value: '[SNAP2]'
+                    },
                     mappedCapsule: {
                         type: CapsulePropertyTypes.Mapping,
                         value: capsule1,
@@ -98,27 +112,32 @@ describe('Snapshot construction & execution with capsule projection', async func
                         type: CapsulePropertyTypes.String,
                         value: undefined
                     },
+                    getCapsuleMeta: {
+                        type: CapsulePropertyTypes.Function,
+                        value: function (this: any) {
+                            return this['#@stream44.studio/encapsulate/structs/Capsule']
+                        }
+                    },
                     hello: {
                         type: CapsulePropertyTypes.Function,
                         value: function (this: any): string {
-
                             const mappedCapsuleResponse = this.mappedCapsule.hello()
 
-                            return `[${prefix}] Hello (capsule2): ${this.username} [mappedCapsule.hello: ${mappedCapsuleResponse}]`
+                            return `${this.PREFIX}[${prefix}] Hello (capsule2): ${this.username} [mappedCapsule.hello: ${mappedCapsuleResponse}]`
                         }
                     },
                     helloGetter1: {
                         type: CapsulePropertyTypes.GetterFunction,
                         value: function (this: any): string {
 
-                            return `[${prefix}] Hello (capsule2): ${this.username}`
+                            return `${this.PREFIX}[${prefix}] Hello (capsule2): ${this.username}`
                         }
                     },
                     helloGetter2: {
                         type: CapsulePropertyTypes.GetterFunction,
                         value: async function (this: any): Promise<string> {
 
-                            return `[${prefix}] Hello (capsule2): ${this.username}`
+                            return `${this.PREFIX}[${prefix}] Hello (capsule2): ${this.username}`
                         }
                     }
                 }
@@ -163,6 +182,7 @@ describe('Snapshot construction & execution with capsule projection', async func
 
         const { run } = await SpineRuntime({
             snapshot,
+            spineFilesystemRoot,
             spineContracts: {
                 '#@stream44.studio/encapsulate/spine-contracts/CapsuleSpineContract.v0': CapsuleSpineContract(commonSpineContractOpts)
             },
@@ -191,6 +211,40 @@ describe('Snapshot construction & execution with capsule projection', async func
             // The execution context is passed to the capsules invoked in this callback
             // as long as they run in the same turn of the event loop.
 
+            // Assert capsule metadata for capsule1
+            const capsule1Meta = apis['capsule1'].getCapsuleMeta()
+            expect(capsule1Meta).toBeDefined()
+            expect(capsule1Meta.capsuleName).toBe('capsule1')
+            expect(capsule1Meta.capsuleSourceLineRef).toMatch(/^\/.*\/tests\/04-Snapshotting\/main\.test\.ts:\d+$/)
+            expect(capsule1Meta.moduleFilepath).toMatch(/^\/.*\/tests\/04-Snapshotting\/main\.test\.ts$/)
+            // capsule1 has no extends, so it is its own root
+            // Note: paths may be relative when loaded from snapshot without spineFilesystemRoot
+            expect(capsule1Meta.rootCapsule.capsuleName).toBe('capsule1')
+            expect(capsule1Meta.rootCapsule.capsuleSourceLineRef).toMatch(/^\/.*\/tests\/04-Snapshotting\/main\.test\.ts:\d+$/)
+            expect(capsule1Meta.rootCapsule.moduleFilepath).toMatch(/^\/.*\/tests\/04-Snapshotting\/main\.test\.ts$/)
+
+            // Assert capsule metadata for capsule2
+            const capsule2Meta = apis['capsule2'].getCapsuleMeta()
+            expect(capsule2Meta).toBeDefined()
+            expect(capsule2Meta.capsuleName).toBe('capsule2')
+            expect(capsule2Meta.capsuleSourceLineRef).toMatch(/^\/.*\/tests\/04-Snapshotting\/main\.test\.ts:\d+$/)
+            expect(capsule2Meta.moduleFilepath).toMatch(/^\/.*\/tests\/04-Snapshotting\/main\.test\.ts$/)
+            // capsule2 has no extends, so it is its own root
+            // Note: paths may be relative when loaded from snapshot without spineFilesystemRoot
+            expect(capsule2Meta.rootCapsule.capsuleName).toBe('capsule2')
+            expect(capsule2Meta.rootCapsule.capsuleSourceLineRef).toMatch(/^\/.*\/tests\/04-Snapshotting\/main\.test\.ts:\d+$/)
+            expect(capsule2Meta.rootCapsule.moduleFilepath).toMatch(/^\/.*\/tests\/04-Snapshotting\/main\.test\.ts$/)
+
+            // Assert that capsule2's mapped capsule (capsule1) has correct root metadata
+            const mappedCapsuleMeta = apis['capsule2'].mappedCapsule.getCapsuleMeta()
+            expect(mappedCapsuleMeta).toBeDefined()
+            expect(mappedCapsuleMeta.capsuleName).toBe('capsule1')
+            // The mapped capsule should see capsule2 as its root (capsule2 initiated the mapping)
+            // Note: paths may be relative when loaded from snapshot without spineFilesystemRoot
+            expect(mappedCapsuleMeta.rootCapsule.capsuleName).toBe('capsule2')
+            expect(mappedCapsuleMeta.rootCapsule.capsuleSourceLineRef).toMatch(/^\/.*\/tests\/04-Snapshotting\/main\.test\.ts:\d+$/)
+            expect(mappedCapsuleMeta.rootCapsule.moduleFilepath).toMatch(/^\/.*\/tests\/04-Snapshotting\/main\.test\.ts$/)
+
             // Run Capsule DAG on Spine
             return Promise.all([
                 apis['capsule1'].hello(),
@@ -206,16 +260,98 @@ describe('Snapshot construction & execution with capsule projection', async func
         })
 
         expect(result as any).toEqual([
-            '[capsule][global] Hello (capsule1): World',
-            '[capsule][global] Hello (capsule1): World',
-            '[capsule][global] Hello (capsule1): World',
-            '[capsule] Hello (capsule2): Sun [mappedCapsule.hello: [capsule][realm:Admin] Hello (capsule1): World]',
-            '[capsule] Hello (capsule2): Sun',
-            '[capsule] Hello (capsule2): Sun',
-            '[capsule][realm:Admin] Hello (capsule1): World',
-            '[capsule][realm:Admin] Hello (capsule1): World',
-            '[capsule][realm:Admin] Hello (capsule1): World'
+            '[SNAP][capsule][global] Hello (capsule1): World',
+            '[SNAP][capsule][global] Hello (capsule1): World',
+            '[SNAP][capsule][global] Hello (capsule1): World',
+            '[SNAP2][capsule] Hello (capsule2): Sun [mappedCapsule.hello: [SNAP][capsule][realm:Admin] Hello (capsule1): World]',
+            '[SNAP2][capsule] Hello (capsule2): Sun',
+            '[SNAP2][capsule] Hello (capsule2): Sun',
+            '[SNAP][capsule][realm:Admin] Hello (capsule1): World',
+            '[SNAP][capsule][realm:Admin] Hello (capsule1): World',
+            '[SNAP][capsule][realm:Admin] Hello (capsule1): World'
         ])
+    })
+
+})
+
+
+describe('Capsule metadata struct with Membrane spine contract', async function () {
+
+    const spineFilesystemRoot = join(import.meta.dir, '../../../../..')
+
+    it('Capsule metadata should be accessible via this["#@stream44.studio/encapsulate/structs/Capsule"]', async () => {
+
+        const { encapsulate, CapsulePropertyTypes, makeImportStack, commonSpineContractOpts } = await CapsuleSpineFactory({
+            spineFilesystemRoot,
+            capsuleModuleProjectionRoot: import.meta.dir,
+            spineContracts: {
+                ['#' + MembraneCapsuleSpineContract['#']]: MembraneCapsuleSpineContract
+            }
+        })
+
+        const prefix = 'membrane'
+
+        const capsule1 = await encapsulate({
+            '#@stream44.studio/encapsulate/spine-contracts/CapsuleSpineContract.v0': {
+                '#@stream44.studio/encapsulate/structs/Capsule': {},
+                '#': {
+                    PREFIX: {
+                        type: CapsulePropertyTypes.Constant,
+                        value: '[MEM]'
+                    },
+                    realm: {
+                        type: CapsulePropertyTypes.Literal,
+                        value: 'global'
+                    },
+                    username: {
+                        type: CapsulePropertyTypes.String,
+                        value: 'TestUser'
+                    },
+                    getCapsuleMeta: {
+                        type: CapsulePropertyTypes.Function,
+                        value: function (this: any) {
+                            return this['#@stream44.studio/encapsulate/structs/Capsule']
+                        }
+                    },
+                    hello: {
+                        type: CapsulePropertyTypes.Function,
+                        value: function (this: any): string {
+                            return `${this.PREFIX}[${prefix}][${this.realm}] Hello: ${this.username}`
+                        }
+                    }
+                }
+            }
+        }, {
+            importMeta: import.meta,
+            importStack: makeImportStack(),
+            capsuleName: 'membraneCapsule1',
+            ambientReferences: {
+                prefix
+            }
+        })
+
+        const { run } = await SpineRuntime({
+            spineFilesystemRoot,
+            capsules: {
+                'membraneCapsule1': capsule1
+            },
+            spineContracts: {
+                '#@stream44.studio/encapsulate/spine-contracts/CapsuleSpineContract.v0': MembraneCapsuleSpineContract(commonSpineContractOpts)
+            }
+        })
+
+        const result = await run({}, async ({ apis }) => {
+            // Assert capsule metadata
+            const capsuleMeta = apis['membraneCapsule1'].getCapsuleMeta()
+            expect(capsuleMeta).toBeDefined()
+            expect(capsuleMeta.capsuleName).toBe('membraneCapsule1')
+            expect(capsuleMeta.capsuleSourceLineRef).toMatch(/^\/.*\/tests\/04-Snapshotting\/main\.test\.ts:\d+$/)
+            expect(capsuleMeta.moduleFilepath).toMatch(/^\/.*\/tests\/04-Snapshotting\/main\.test\.ts$/)
+
+            return apis['membraneCapsule1'].hello()
+        })
+
+        expect(result).toBe('[MEM][membrane][global] Hello: TestUser')
     })
 
 })

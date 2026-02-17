@@ -1,4 +1,8 @@
 
+// CACHE_BUST_VERSION: Increment this whenever CST cache must be invalidated due to structural changes
+// This ensures projected capsules are regenerated when the CST format changes
+const CACHE_BUST_VERSION = 9
+
 type TSpineOptions = {
     spineFilesystemRoot?: string,
     spineContracts: Record<string, any>,
@@ -32,7 +36,7 @@ type TSpineRuntimeOptions = {
     spineContracts?: Record<string, any>,
     snapshot?: TSpineSnapshot,
     capsules?: Record<string, any>,
-    loadCapsule?: (options: { capsuleSourceLineRef: string, capsuleSnapshot: any, capsuleName?: string }) => Promise<any>
+    loadCapsule?: (options: { capsuleSourceLineRef: string, capsuleSnapshot: any, capsuleName?: string, cacheBustVersion?: number }) => Promise<any>
 }
 
 type TCapsuleSnapshot = {
@@ -44,7 +48,12 @@ type TCapsuleMakeInstanceOptions = {
     overrides?: Record<string, any>,
     options?: Record<string, any>,
     runtimeSpineContracts?: Record<string, any>,
-    sharedSelf?: Record<string, any>
+    sharedSelf?: Record<string, any>,
+    rootCapsule?: {
+        capsuleName: string,
+        capsuleSourceLineRef: string,
+        moduleFilepath: string
+    }
 }
 
 type TCapsule = {
@@ -97,6 +106,7 @@ export const CapsulePropertyTypes = {
     String: 'String' as const,
     Mapping: 'Mapping' as const,
     Literal: 'Literal' as const,
+    Constant: 'Constant' as const,
     StructInit: 'StructInit' as const,
 }
 
@@ -299,8 +309,18 @@ export async function SpineRuntime(options: TSpineRuntimeOptions): Promise<TSpin
             const capsule = await options.loadCapsule!({
                 capsuleSourceLineRef,
                 capsuleSnapshot,
-                capsuleName
+                capsuleName,
+                cacheBustVersion: CACHE_BUST_VERSION
             })
+
+            // If loadCapsule returns null, it means cache bust version mismatch - regenerate the capsule
+            if (capsule === null) {
+                throw new Error(
+                    `Cache bust version mismatch for capsule '${capsuleSourceLineRef}'. ` +
+                    `Expected version ${CACHE_BUST_VERSION} but found ${(capsuleSnapshot as any).cst?.cacheBustVersion}. ` +
+                    `Please delete the cache directory and regenerate capsules.`
+                )
+            }
 
             loadedCapsules[capsuleSourceLineRef] = await capsule({
                 encapsulate: spine.encapsulate,
@@ -392,28 +412,59 @@ async function encapsulate(definition: TCapsuleDefinition, options: TCapsuleOpti
     if (!options.importMeta && !options.moduleFilepath) throw new Error(`'options.importMeta' nor 'options.moduleFilepath' not specified!`)
     if (!options.importStack && !options.importStackLine) throw new Error(`'options.importStack' nor 'options.importStackLine' specified!`)
 
-    const moduleFilepath = options.moduleFilepath || relative(spine.spineOptions.spineFilesystemRoot || '', options.importMeta!.url.replace(/^file:\/\//, ''))
+    // Use relative path for internal processing, but store absolute path for metadata
+    const providedPath = options.moduleFilepath || options.importMeta!.url.replace(/^file:\/\//, '')
+    const spineRoot = spine.spineOptions.spineFilesystemRoot || ''
+
+    // Determine if we need to make the path absolute
+    let absoluteModuleFilepath: string
+    if (providedPath.startsWith('/')) {
+        // Already an absolute path (starts with /)
+        absoluteModuleFilepath = providedPath
+    } else if (spineRoot) {
+        // Relative path - make it absolute by joining with spine root
+        absoluteModuleFilepath = join(spineRoot, providedPath)
+    } else {
+        // No spine root and path is relative - use as-is (will remain relative)
+        // Note: This happens when SpineRuntime doesn't pass spineFilesystemRoot through
+        absoluteModuleFilepath = providedPath
+    }
+
+    const moduleFilepath = relative(spineRoot, absoluteModuleFilepath)
     const importStackLine = options.importStackLine || formatImportStackFrame(options.importStack!)
 
     if (typeof importStackLine !== 'number') throw new Error(`Could not determine importStackLine from options`)
 
-    const encapsulateOptions: TEncapsulateOptions = {
-        moduleFilepath,
-        importStackLine,
-        capsuleName: options.capsuleName,
-        ambientReferences: options.ambientReferences,
-        extendsCapsule: options.extendsCapsule,
-        capsuleSourceLineRef: `${moduleFilepath}:${importStackLine}`
-    }
+    const capsuleSourceLineRef = `${moduleFilepath}:${importStackLine}`
 
     spine.spineOptions.timing?.record(`Encapsulate: Start for ${moduleFilepath}`)
 
     const { csts, crts } = await spine.spineOptions.staticAnalyzer?.parseModule({
         spineOptions: spine.spineOptions,
-        encapsulateOptions
+        encapsulateOptions: {
+            moduleFilepath,
+            importStackLine,
+            capsuleSourceLineRef,
+            capsuleName: options.capsuleName,
+            ambientReferences: options.ambientReferences,
+            cacheBustVersion: CACHE_BUST_VERSION
+        }
     }) || {
-        csts: options.cst ? { [encapsulateOptions.capsuleSourceLineRef]: options.cst } : undefined,
-        crts: options.crt ? { [encapsulateOptions.capsuleSourceLineRef]: options.crt } : undefined
+        csts: options.cst ? { [capsuleSourceLineRef]: options.cst } : undefined,
+        crts: options.crt ? { [capsuleSourceLineRef]: options.crt } : undefined
+    }
+
+    // Get capsuleName from options first, then fall back to CST if available
+    const cst = csts?.[capsuleSourceLineRef]
+    const capsuleName = options.capsuleName || cst?.source?.capsuleName
+
+    const encapsulateOptions: TEncapsulateOptions = {
+        moduleFilepath,
+        importStackLine,
+        capsuleName,
+        ambientReferences: options.ambientReferences,
+        extendsCapsule: options.extendsCapsule,
+        capsuleSourceLineRef
     }
 
     const defaultInstance: Record<string, any> = {}
@@ -431,9 +482,9 @@ async function encapsulate(definition: TCapsuleDefinition, options: TCapsuleOpti
         capsuleSourceLineRef: encapsulateOptions.capsuleSourceLineRef,
         definition,
         encapsulateOptions,
-        cst: csts?.[encapsulateOptions.capsuleSourceLineRef],
-        crt: crts?.[encapsulateOptions.capsuleSourceLineRef],
-        makeInstance: async ({ overrides = {}, options = {}, runtimeSpineContracts, sharedSelf }: TCapsuleMakeInstanceOptions = {}) => {
+        cst,
+        crt: crts?.[capsuleSourceLineRef],
+        makeInstance: async ({ overrides = {}, options = {}, runtimeSpineContracts, sharedSelf, rootCapsule }: TCapsuleMakeInstanceOptions = {}) => {
 
             // Create cache key based on parameters
             // When sharedSelf is provided, we must NOT cache because each extending capsule
@@ -593,6 +644,22 @@ async function encapsulate(definition: TCapsuleDefinition, options: TCapsuleOpti
                 // The selfProxy in spine contracts will expose this as 'self' property
                 const ownSelf = merge({}, defaultInstance, defaultPropertyValues, ...Object.values(mergedValuesByContract))
 
+                // Capsule metadata struct will be set on self/ownSelf AFTER spine contract processing
+                // to avoid being overwritten by the empty struct marker in the definition
+                // Convert relative paths to absolute for metadata exposure
+                const absoluteCapsuleSourceLineRef = `${absoluteModuleFilepath}:${importStackLine}`
+                const capsuleMetadataStruct = {
+                    capsuleName: encapsulateOptions.capsuleName,
+                    capsuleSourceLineRef: absoluteCapsuleSourceLineRef,
+                    moduleFilepath: absoluteModuleFilepath,
+                    // Root capsule metadata will be populated after extends chain is resolved
+                    rootCapsule: {
+                        capsuleName: undefined as string | undefined,
+                        capsuleSourceLineRef: undefined as string | undefined,
+                        moduleFilepath: undefined as string | undefined
+                    }
+                }
+
                 // Initialize extended capsule instance if this capsule extends another
                 // Pass our self so extended capsule's functions bind to the same context
                 let extendedCapsuleInstance: any = undefined
@@ -657,16 +724,34 @@ async function encapsulate(definition: TCapsuleDefinition, options: TCapsuleOpti
                         overrides,
                         options,
                         runtimeSpineContracts,
-                        sharedSelf: self
+                        sharedSelf: self,
+                        rootCapsule: rootCapsule || {
+                            capsuleName: encapsulateOptions.capsuleName!,
+                            capsuleSourceLineRef: absoluteCapsuleSourceLineRef,
+                            moduleFilepath: absoluteModuleFilepath
+                        }
                     })
                 }
+
+                // Resolve the root capsule for this instance:
+                // If rootCapsule was passed down from a parent, use it (preserves the first capsule in the chain).
+                // Otherwise this capsule IS the root.
+                const resolvedRootCapsule = rootCapsule || {
+                    capsuleName: encapsulateOptions.capsuleName!,
+                    capsuleSourceLineRef: absoluteCapsuleSourceLineRef,
+                    moduleFilepath: absoluteModuleFilepath
+                }
+                capsuleMetadataStruct.rootCapsule.capsuleName = resolvedRootCapsule.capsuleName
+                capsuleMetadataStruct.rootCapsule.capsuleSourceLineRef = resolvedRootCapsule.capsuleSourceLineRef
+                capsuleMetadataStruct.rootCapsule.moduleFilepath = resolvedRootCapsule.moduleFilepath
 
                 const capsuleInstance: any = {
                     api: encapsulatedApi,
                     spineContractCapsuleInstances,
                     extendedCapsuleInstance,
                     structInitFunctions: [] as Array<() => any>,
-                    mappedCapsuleInstances: [] as Array<any>
+                    mappedCapsuleInstances: [] as Array<any>,
+                    rootCapsule: resolvedRootCapsule
                 }
 
                 // Use runtime spine contracts if provided, otherwise fall back to encapsulation spine contracts
@@ -714,6 +799,15 @@ async function encapsulate(definition: TCapsuleDefinition, options: TCapsuleOpti
                         }
                     }
                 }
+
+                // Set capsule metadata struct on self/ownSelf AFTER spine contract processing
+                // to avoid being overwritten by the empty struct marker in the definition
+                if (!self['#@stream44.studio/encapsulate/structs/Capsule'] ||
+                    typeof self['#@stream44.studio/encapsulate/structs/Capsule'] !== 'object' ||
+                    !self['#@stream44.studio/encapsulate/structs/Capsule'].capsuleName) {
+                    self['#@stream44.studio/encapsulate/structs/Capsule'] = capsuleMetadataStruct
+                }
+                ownSelf['#@stream44.studio/encapsulate/structs/Capsule'] = capsuleMetadataStruct
 
                 // Collect StructInit functions and mapped capsule instances from all spine contract capsule instances
                 for (const spineContractCapsuleInstance of Object.values(spineContractCapsuleInstances)) {

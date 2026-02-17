@@ -192,7 +192,24 @@ it('Membrane construction & execution', async function () {
         '33ef2e9143c47fb44aae8f7c55a210cc'
     ])
 
-    expect(JSON.parse(JSON.stringify(membraneEvents))).toMatchSnapshot()
+    expect(membraneEvents.length).toBeGreaterThan(0)
+    expect(membraneEvents[0].event).toBe('get')
+    expect(membraneEvents[0].target.prop).toBe('username')
+    expect(membraneEvents[0].target.capsuleSourceLineRef).toMatch(/main\.test\.ts:69$/)
+    expect(membraneEvents[0].target.capsuleSourceNameRef).toMatch(/main\.test\.ts:capsule1$/)
+    expect(membraneEvents[0].target.capsuleSourceNameRefHash).toBe('33ef2e9143c47fb44aae8f7c55a210cc')
+    expect(membraneEvents[0].value).toBe('World')
+
+    const callEvents = membraneEvents.filter((e: any) => e.event === 'call')
+    expect(callEvents.length).toBeGreaterThan(0)
+    expect(callEvents[0].target.prop).toBe('hello')
+
+    const callResultEvents = membraneEvents.filter((e: any) => e.event === 'call-result')
+    expect(callResultEvents.length).toBeGreaterThan(0)
+    expect(callResultEvents[0].result).toBe('[global] Hello (capsule1): World')
+
+    const structEvents = membraneEvents.filter((e: any) => e.target?.capsuleSourceLineRef?.includes('structs/Capsule.ts'))
+    expect(structEvents.length).toBeGreaterThan(0)
 })
 
 

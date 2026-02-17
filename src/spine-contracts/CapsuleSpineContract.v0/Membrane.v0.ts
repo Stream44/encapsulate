@@ -80,7 +80,8 @@ class MembraneContractCapsuleInstanceFactory extends ContractCapsuleInstanceFact
         currentCallerContext,
         runtimeSpineContracts,
         instanceRegistry,
-        extendedCapsuleInstance
+        extendedCapsuleInstance,
+        capsuleInstance
     }: {
         spineContractUri: string
         capsule: any
@@ -100,8 +101,9 @@ class MembraneContractCapsuleInstanceFactory extends ContractCapsuleInstanceFact
         runtimeSpineContracts?: Record<string, any>
         instanceRegistry?: CapsuleInstanceRegistry
         extendedCapsuleInstance?: any
+        capsuleInstance?: any
     }) {
-        super({ spineContractUri, capsule, self, ownSelf, encapsulatedApi, resolve, importCapsule, spineFilesystemRoot, freezeCapsule, instanceRegistry, extendedCapsuleInstance })
+        super({ spineContractUri, capsule, self, ownSelf, encapsulatedApi, resolve, importCapsule, spineFilesystemRoot, freezeCapsule, instanceRegistry, extendedCapsuleInstance, capsuleInstance })
         this.getEventIndex = getEventIndex
         this.incrementEventIndex = incrementEventIndex
         this.currentCallerContext = currentCallerContext
@@ -230,7 +232,8 @@ class MembraneContractCapsuleInstanceFactory extends ContractCapsuleInstanceFact
         const mappedCapsuleInstance = await mappedCapsule.makeInstance({
             overrides: mappedOverrides,
             options: mappingOptions,
-            runtimeSpineContracts: this.runtimeSpineContracts
+            runtimeSpineContracts: this.runtimeSpineContracts,
+            rootCapsule: this.capsuleInstance?.rootCapsule
         })
 
         // Register the instance (replaces null pre-registration marker)
@@ -344,6 +347,8 @@ class MembraneContractCapsuleInstanceFactory extends ContractCapsuleInstanceFact
     }
 
     protected mapLiteralProperty({ property }: { property: any }) {
+        // Constant properties are read-only and throw on set
+        const isConstant = property.definition.type === CapsulePropertyTypes.Constant
 
         const value = typeof this.self[property.name] !== 'undefined'
             ? this.self[property.name]
@@ -388,6 +393,11 @@ class MembraneContractCapsuleInstanceFactory extends ContractCapsuleInstanceFact
                 return currentValue
             },
             set: (newValue) => {
+                // Constant properties cannot be set
+                if (isConstant) {
+                    throw new Error(`Cannot set constant property '${property.name}'`)
+                }
+
                 const event: any = {
                     event: 'set',
                     eventIndex: this.incrementEventIndex(),
@@ -585,7 +595,7 @@ export function CapsuleSpineContract({
     return {
         '#': CapsuleSpineContract['#'],
         instanceRegistry,
-        makeContractCapsuleInstance: ({ encapsulateOptions, spineContractUri, self, ownSelf, capsule, encapsulatedApi, runtimeSpineContracts, extendedCapsuleInstance }: { encapsulateOptions: any, spineContractUri: string, self: any, ownSelf?: any, capsule?: any, encapsulatedApi: Record<string, any>, runtimeSpineContracts?: Record<string, any>, extendedCapsuleInstance?: any }) => {
+        makeContractCapsuleInstance: ({ encapsulateOptions, spineContractUri, self, ownSelf, capsule, encapsulatedApi, runtimeSpineContracts, extendedCapsuleInstance, capsuleInstance }: { encapsulateOptions: any, spineContractUri: string, self: any, ownSelf?: any, capsule?: any, encapsulatedApi: Record<string, any>, runtimeSpineContracts?: Record<string, any>, extendedCapsuleInstance?: any, capsuleInstance?: any }) => {
             return new MembraneContractCapsuleInstanceFactory({
                 spineContractUri,
                 capsule,
@@ -604,7 +614,8 @@ export function CapsuleSpineContract({
                 currentCallerContext,
                 runtimeSpineContracts,
                 instanceRegistry,
-                extendedCapsuleInstance
+                extendedCapsuleInstance,
+                capsuleInstance
             })
         },
         hydrate: ({ capsuleSnapshot }: { capsuleSnapshot: any }): any => {

@@ -20,7 +20,7 @@ describe('Minimal Capsule Projection and Runtime', () => {
         // Ensure node_modules/@caps symlink exists
         const nodeModulesDir = join(import.meta.dir, 'node_modules')
         const capsSymlink = join(nodeModulesDir, '@caps')
-        const capsTarget = join(import.meta.dir, '.~caps')
+        const capsTarget = join(import.meta.dir, '.~o/encapsulate.dev/caps')
 
         await mkdir(nodeModulesDir, { recursive: true })
 

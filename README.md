@@ -27,6 +27,12 @@ Notes
 - The first spine contract is defined and implemented here: [src/spine-contracts/CapsuleSpineContract.v0/](src/spine-contracts/CapsuleSpineContract.v0/)
 - Projector reference implementations are here: [github.com/Stream44/ink-component-projector](https://github.com/Stream44/ink-component-projector)
 
+Roadmap
+---
+
+- [ ] Document [src/spine-contracts/CapsuleSpineContract.v0/](src/spine-contracts/CapsuleSpineContract.v0/)
+- [ ] Private properties
+
 
 Provenance
 ===
@@ -45,4 +51,4 @@ Repository DID: `did:repo:412cd408c657737343a6089ed6d5f0668a8bfb05`
   </tr>
 </table>
 
-(c) 2026 [Christoph.diy](https://christoph.diy) • Code: `MIT` • Text: `CC-BY` • Created with [Stream44.Studio](https://Stream44.Studio)
+(c) 2026 [Christoph.diy](https://christoph.diy) • Code: `BSD-2-Clause-Patent` • Text: `CC-BY` • Created with [Stream44.Studio](https://Stream44.Studio)

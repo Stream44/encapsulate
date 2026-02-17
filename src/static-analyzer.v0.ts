@@ -235,10 +235,18 @@ export function StaticAnalyzer({
                         ])
 
                         if (cstsContent && crtsContent) {
-                            timing?.record(`StaticAnalyzer: Cache HIT for ${encapsulateOptions.moduleFilepath}`)
-                            return {
-                                csts: JSON.parse(cstsContent),
-                                crts: JSON.parse(crtsContent)
+                            const cachedCsts = JSON.parse(cstsContent)
+
+                            // Check cache bust version - if mismatch, regenerate
+                            const cachedVersion = cachedCsts?.[capsuleSourceLineRef]?.cacheBustVersion
+                            if (encapsulateOptions.cacheBustVersion !== undefined && cachedVersion !== encapsulateOptions.cacheBustVersion) {
+                                timing?.record(timing?.chalk?.red?.(`StaticAnalyzer: Cache BUST (version mismatch: ${cachedVersion} !== ${encapsulateOptions.cacheBustVersion}) for ${encapsulateOptions.moduleFilepath}`))
+                            } else {
+                                timing?.record(`StaticAnalyzer: Cache HIT for ${encapsulateOptions.moduleFilepath}`)
+                                return {
+                                    csts: cachedCsts,
+                                    crts: JSON.parse(crtsContent)
+                                }
                             }
                         }
                     }
@@ -340,6 +348,7 @@ export function StaticAnalyzer({
                     )
 
                     const cst: any = {
+                        cacheBustVersion: encapsulateOptions.cacheBustVersion || 1,
                         capsuleSourceLineRef,
                         capsuleSourceNameRef,
                         capsuleSourceNameRefHash,

@@ -17,10 +17,11 @@ export class ContractCapsuleInstanceFactory {
     protected extendedCapsuleInstance?: any
     protected ownSelf?: any
     protected runtimeSpineContracts?: Record<string, any>
+    protected capsuleInstance?: any
     public structInitFunctions: Array<() => any> = []
     public mappedCapsuleInstances: Array<any> = []
 
-    constructor({ spineContractUri, capsule, self, ownSelf, encapsulatedApi, resolve, importCapsule, spineFilesystemRoot, freezeCapsule, instanceRegistry, extendedCapsuleInstance, runtimeSpineContracts }: { spineContractUri: string, capsule: any, self: any, ownSelf?: any, encapsulatedApi: Record<string, any>, resolve?: (uri: string, parentFilepath: string) => Promise<string>, importCapsule?: (filepath: string) => Promise<any>, spineFilesystemRoot?: string, freezeCapsule?: (capsule: any) => Promise<any>, instanceRegistry?: CapsuleInstanceRegistry, extendedCapsuleInstance?: any, runtimeSpineContracts?: Record<string, any> }) {
+    constructor({ spineContractUri, capsule, self, ownSelf, encapsulatedApi, resolve, importCapsule, spineFilesystemRoot, freezeCapsule, instanceRegistry, extendedCapsuleInstance, runtimeSpineContracts, capsuleInstance }: { spineContractUri: string, capsule: any, self: any, ownSelf?: any, encapsulatedApi: Record<string, any>, resolve?: (uri: string, parentFilepath: string) => Promise<string>, importCapsule?: (filepath: string) => Promise<any>, spineFilesystemRoot?: string, freezeCapsule?: (capsule: any) => Promise<any>, instanceRegistry?: CapsuleInstanceRegistry, extendedCapsuleInstance?: any, runtimeSpineContracts?: Record<string, any>, capsuleInstance?: any }) {
         this.spineContractUri = spineContractUri
         this.capsule = capsule
         this.self = self
@@ -33,6 +34,7 @@ export class ContractCapsuleInstanceFactory {
         this.instanceRegistry = instanceRegistry
         this.extendedCapsuleInstance = extendedCapsuleInstance
         this.runtimeSpineContracts = runtimeSpineContracts
+        this.capsuleInstance = capsuleInstance
     }
 
     async mapProperty({ overrides, options, property }: { overrides: any, options: any, property: any }) {
@@ -40,7 +42,8 @@ export class ContractCapsuleInstanceFactory {
             await this.mapMappingProperty({ overrides, options, property })
         } else if (
             property.definition.type === CapsulePropertyTypes.String ||
-            property.definition.type === CapsulePropertyTypes.Literal
+            property.definition.type === CapsulePropertyTypes.Literal ||
+            property.definition.type === CapsulePropertyTypes.Constant
         ) {
             this.mapLiteralProperty({ property })
         } else if (property.definition.type === CapsulePropertyTypes.Function) {
@@ -226,7 +229,8 @@ export class ContractCapsuleInstanceFactory {
         const mappedInstance = await mappedCapsule.makeInstance({
             overrides: mappedOverrides,
             options: mappingOptions,
-            runtimeSpineContracts: this.runtimeSpineContracts
+            runtimeSpineContracts: this.runtimeSpineContracts,
+            rootCapsule: this.capsuleInstance?.rootCapsule
         })
 
         // Register the instance (replaces null pre-registration marker)
@@ -369,7 +373,7 @@ export function CapsuleSpineContract({ freezeCapsule, resolve, importCapsule, sp
     return {
         '#': CapsuleSpineContract['#'],
         instanceRegistry,
-        makeContractCapsuleInstance: ({ spineContractUri, capsule, self, ownSelf, encapsulatedApi, extendedCapsuleInstance, runtimeSpineContracts }: { spineContractUri: string, capsule: any, self: any, ownSelf?: any, encapsulatedApi: Record<string, any>, extendedCapsuleInstance?: any, runtimeSpineContracts?: Record<string, any> }) => {
+        makeContractCapsuleInstance: ({ spineContractUri, capsule, self, ownSelf, encapsulatedApi, extendedCapsuleInstance, runtimeSpineContracts, capsuleInstance }: { spineContractUri: string, capsule: any, self: any, ownSelf?: any, encapsulatedApi: Record<string, any>, extendedCapsuleInstance?: any, runtimeSpineContracts?: Record<string, any>, capsuleInstance?: any }) => {
             return new ContractCapsuleInstanceFactory({
                 spineContractUri,
                 capsule,
@@ -382,7 +386,8 @@ export function CapsuleSpineContract({ freezeCapsule, resolve, importCapsule, sp
                 freezeCapsule,
                 instanceRegistry,
                 extendedCapsuleInstance,
-                runtimeSpineContracts
+                runtimeSpineContracts,
+                capsuleInstance
             })
         },
         hydrate: ({ capsuleSnapshot }: { capsuleSnapshot: any }): any => {
