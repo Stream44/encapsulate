@@ -1,25 +1,21 @@
-{
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "envelope": "ur:envelope/lrtpsotanshdhdcxcekbcemtvagtfgutvltlwerngomnltenfglgzscsbkeodwwneybzmsfliycemtlboyaylftpsohdgltansgylftanshfhdcxftlbrpgabykpfzcsghsoecgazcpljldpntfefssksoaxykkkleenkknlcszektpttansgrhdcxlastfxdsdpaxplrdzcvwbbfessaopdksaeethhmubtgdluwdhhhhhsdycmbgvwbzoycsfncsfgoytpsojyfljljpieinhsjtgwjoihjtgajtjyihiojpinjykktpsokshnjkjkisdpihieeyececehescxfpfpfpfpfxeoglknhsfxehjzhtfygaehglghfeecfpfpfpfpgagdjtgoknhkfxgokpkkgmflgmgleogsdniofdemksksghgaidhdethfjnjegtecfxfphfeeflkphdkkjzkogwfecxjyeeeedpjkiniojtinjtiodpjeihkkoycsfztpsohdjktngdgmgwhflfaxhdimyawzaxjtlddndnlecyqzvdclkskotksafsskdmlgwpbgdszmrerncmuofpaxmkkeahluwnmoidbsiypedmaozsneykjpplurloolghesjedwjtbzstimswwladghiartdetynehekohebdptswmuzedtrelkhywpjnmdihbgaxchwzfmqzlugwtlioftimhkssfristkahtniecyttsgnbmsdwsb",
-  "mark": "241a7fe3",
-  "$defs": {
-    "envelope": {
-      "$ref": "https://datatracker.ietf.org/doc/draft-mcnally-envelope/"
-    },
-    "mark": {
-      "$ref": "https://github.com/BlockchainCommons/Research/blob/master/papers/bcr-2025-001-provenance-mark.md"
-    }
-  }
-}
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$defs:
+  envelope:
+    $ref: "https://datatracker.ietf.org/doc/draft-mcnally-envelope/"
+  mark:
+    $ref: "https://github.com/BlockchainCommons/Research/blob/master/papers/bcr-2025-001-provenance-mark.md"
+envelope: "ur:envelope/lptpsotanshdhdcxwtmtbzpmhhetwdehsknyvdrejphdntiavopycecmmuwzrlhecaiyprhhbylbytrnoyaylftpsohdgltansgylftanshfhdcxfyonwttkhdtokngtjpbdiacwmejnintiwdpeadflmhpsdespynkbbkmsnydajsqdtansgrhdcxgubabwwzdsclswurecrhfmltsnhkhkamleptdywyamtydasgkivsqznsrnfpbdadoycsfncsfgoycsfztpsohdjktngdgmgwhflfaxhdimeejoothkcfmepmptmnzczojyfluybtkeyawzdasojyhtskwecaiywfgarhkgotcmhkvldpzctkhlsthyntsaaddijtmejeleetwnwmjohftyjknsoyimuowfahgmsabzvohlzmidsaheghemwlpycszcsntasoaerpwewffmimhntydttnsgcyfrswzsfhimvdrhtlwftdhnrdfpbnvooytpsoksdtfljljpieinhsjtgwjoihjtgajtjyihiojpinjykkdmgmihjojljkinjyjljpkkgaieihjtjyiniyinihjptpsoksehieinieftjpihjojlftideeeteeiddyehiaiheneceeiydyeheyeyiehseheeiyhseeeeetiaeniyihiyidhsehiaiaecihemenoytpsoksctfljljpieinhsjtgwjoihjtgajtjyihiojpinjykkdmguiniojtinjtiogrihkktpsokshnjkjkisdpihieeyececehescxfpfpfpfpfxeoglknhsfxehjzhtfygaehglghfeecfpfpfpfpgagdjtgoknhkfxgokpkkgmflgmgleogsdniofdemksksghgaidhdethfjnjegtecfxfphfeeflkphdkkjzkogwfecxjyeeeedpjkiniojtinjtiodpjeihkkhdidcwkg"
+mark: "025fc634"
 ---
-# Repository DID: did:repo:412cd408c657737343a6089ed6d5f0668a8bfb05
-# Current Mark: 241a7fe3 (🅑 DARK CITY LAMB VIAL)
-# Inception Mark: 09c16324 (🅑 AXIS SAFE IDEA DARK)
-# XID(1c7e1c96) [
+# Repository DID: did:repo:b484b01ce654f0122da14fa448c6fefba1cc5e76
+# Current Mark: 025fc634 (🅑 ALSO HOPE SKEW EDGE)
+# Inception Mark: 0a8b5c7b (🅑 BACK LUAU HIGH KING)
+# XID(f09615ad) [
 #     'key': Bytes(78) [
 #         'allow': 'All'
 #     ]
-#     "GordianOpenIntegrity": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPnUzYCUuyRGRN3L+gH7xxTIbX8VmkM5CAV4GuXylvOE t44-signing-key"
 #     'provenance': Bytes(115)
+#     "GordianOpenIntegrity.RepositoryIdentifier": "did:repo:b484b01ce654f0122da14fa448c6fefba1cc5e76"
+#     "GordianOpenIntegrity.SigningKey": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPnUzYCUuyRGRN3L+gH7xxTIbX8VmkM5CAV4GuXylvOE t44-signing-key"
 # ]
 # Trust established using https://github.com/Stream44/t44-BlockchainCommons.com
