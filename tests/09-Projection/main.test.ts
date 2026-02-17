@@ -74,17 +74,6 @@ describe('Minimal Capsule Projection and Runtime', () => {
 
         const snapshot = await freeze()
 
-        // Debug: Log snapshot structure for GitHub debugging
-        console.log('[DEBUG] Snapshot capsules keys:', Object.keys(snapshot.capsules || {}))
-        for (const [key, capsule] of Object.entries(snapshot.capsules || {})) {
-            const cap = capsule as any
-            console.log(`[DEBUG] Capsule ${key}:`)
-            console.log('  spineContracts keys:', Object.keys(cap.spineContracts || {}))
-            for (const [scKey, scVal] of Object.entries(cap.spineContracts || {})) {
-                console.log(`  spineContract ${scKey} keys:`, Object.keys(scVal as any || {}))
-            }
-        }
-
         expect(existsSync(projectedFilePath)).toBe(true)
 
         const { commonSpineContractOpts, loadCapsule } = await CapsuleSpineFactory({

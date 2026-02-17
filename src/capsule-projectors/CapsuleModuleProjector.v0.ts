@@ -824,17 +824,12 @@ export function CapsuleModuleProjector({
                     const refTyped = ref as any
                     if (refTyped.type === 'capsule') {
                         const snapshot = await buildCapsuleSnapshotForReference(refTyped, capsules, spineContractUri)
-                        const capsuleName = snapshot.spineContracts?.['#@stream44.studio/encapsulate/spine-contracts/CapsuleSpineContract.v0']?.['#@stream44.studio/encapsulate/structs/Capsule']?.capsuleName
-                        const projectedFilepath = snapshot.spineContracts?.['#@stream44.studio/encapsulate/spine-contracts/CapsuleSpineContract.v0']?.['#@stream44.studio/encapsulate/structs/Capsule']?.projectedCapsuleFilepath
 
-                        // Debug: Log snapshot structure to understand key resolution
-                        console.log('[DEBUG] buildCapsuleSnapshotForReference result:')
-                        console.log('  spineContractUri:', spineContractUri)
-                        console.log('  snapshot.spineContracts keys:', Object.keys(snapshot.spineContracts || {}))
+                        // Use dynamic spineContractUri instead of hardcoded URI
                         const contractData = snapshot.spineContracts?.[spineContractUri]
-                        console.log('  contractData keys:', Object.keys(contractData || {}))
-                        console.log('  capsuleName:', capsuleName)
-                        console.log('  projectedFilepath:', projectedFilepath)
+                        const structKey = Object.keys(contractData || {}).find(k => k.includes('/structs/Capsule'))
+                        const capsuleName = structKey ? contractData[structKey]?.capsuleName : undefined
+                        const projectedFilepath = structKey ? contractData[structKey]?.projectedCapsuleFilepath : undefined
 
                         if (capsuleName && projectedFilepath) {
                             allCapsuleUris.add(capsuleName)
@@ -990,7 +985,9 @@ export default function({ onMembraneEvent }: { onMembraneEvent?: (event: any) =>
                 const refTyped = ref as any
                 if (refTyped.type === 'capsule') {
                     const snapshot = await buildCapsuleSnapshotForReference(refTyped, capsules, spineContractUri)
-                    const capsuleName = snapshot.spineContracts?.['#@stream44.studio/encapsulate/spine-contracts/CapsuleSpineContract.v0']?.['#@stream44.studio/encapsulate/structs/Capsule']?.capsuleName
+                    const contractData = snapshot.spineContracts?.[spineContractUri]
+                    const structKey = Object.keys(contractData || {}).find(k => k.includes('/structs/Capsule'))
+                    const capsuleName = structKey ? contractData[structKey]?.capsuleName : undefined
                     if (capsuleName) {
                         allCapsuleUris.add(capsuleName)
                     }
@@ -1014,7 +1011,9 @@ export default function({ onMembraneEvent }: { onMembraneEvent?: (event: any) =>
 
                 if (capsuleRef) {
                     const snapshot = await buildCapsuleSnapshotForReference(capsuleRef, capsules, spineContractUri)
-                    const projectedFilepath = snapshot.spineContracts?.['#@stream44.studio/encapsulate/spine-contracts/CapsuleSpineContract.v0']?.['#@stream44.studio/encapsulate/structs/Capsule']?.projectedCapsuleFilepath
+                    const contractData = snapshot.spineContracts?.[spineContractUri]
+                    const structKey = Object.keys(contractData || {}).find(k => k.includes('/structs/Capsule'))
+                    const projectedFilepath = structKey ? contractData[structKey]?.projectedCapsuleFilepath : undefined
 
                     if (projectedFilepath) {
                         // Build import path from projected filepath
@@ -1328,7 +1327,9 @@ ${defaultExport}
                         const refTyped = ref as any
                         if (refTyped.type === 'capsule') {
                             const snapshot = await buildCapsuleSnapshotForReference(refTyped, capsules, spineContractUri)
-                            const capsuleName = snapshot.spineContracts?.['#@stream44.studio/encapsulate/spine-contracts/CapsuleSpineContract.v0']?.['#@stream44.studio/encapsulate/structs/Capsule']?.capsuleName
+                            const contractData = snapshot.spineContracts?.[spineContractUri]
+                            const structKey = Object.keys(contractData || {}).find(k => k.includes('/structs/Capsule'))
+                            const capsuleName = structKey ? contractData[structKey]?.capsuleName : undefined
                             if (capsuleName) {
                                 allMappedCapsuleUris.add(capsuleName)
                             }
@@ -1482,7 +1483,9 @@ export default function({ onMembraneEvent }: { onMembraneEvent?: (event: any) =>
                     const refTyped = ref as any
                     if (refTyped.type === 'capsule') {
                         const snapshot = await buildCapsuleSnapshotForReference(refTyped, capsules, spineContractUri)
-                        const capsuleName = snapshot.spineContracts?.['#@stream44.studio/encapsulate/spine-contracts/CapsuleSpineContract.v0']?.['#@stream44.studio/encapsulate/structs/Capsule']?.capsuleName
+                        const contractData = snapshot.spineContracts?.[spineContractUri]
+                        const structKey = Object.keys(contractData || {}).find(k => k.includes('/structs/Capsule'))
+                        const capsuleName = structKey ? contractData[structKey]?.capsuleName : undefined
                         if (capsuleName) {
                             allMappedCapsuleUris.add(capsuleName)
                         }
