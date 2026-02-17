@@ -212,9 +212,42 @@ async function resolve(uri: string, fromPath: string, spineRoot?: string): Promi
 
     // Non-scoped bare specifier — try node_modules resolution from fromPath
     if (!uri.startsWith('.') && !uri.startsWith('/')) {
-        // Walk up from fromPath looking for node_modules
+        // Parse package name and subpath (e.g., "t44/caps/WorkspaceCli" -> pkg="t44", subpath="caps/WorkspaceCli")
+        const slashIdx = uri.indexOf('/')
+        const pkg = slashIdx === -1 ? uri : uri.slice(0, slashIdx)
+        const subpath = slashIdx === -1 ? undefined : uri.slice(slashIdx + 1)
+
+        // Walk up from fromPath looking for self-package or node_modules
         let dir = dirname(fromPath)
         while (true) {
+            // Check if this directory's package.json matches the requested package (self-package resolution)
+            try {
+                const pjPath = join(dir, 'package.json')
+                const pj = JSON.parse(await readFile(pjPath, 'utf-8'))
+                if (pj.name === pkg) {
+                    if (subpath) {
+                        if (pj.exports) {
+                            const exportKey = './' + subpath
+                            const exportValue = pj.exports[exportKey]
+                            if (typeof exportValue === 'string') {
+                                return pathResolve(dir, exportValue)
+                            }
+                        }
+                        const fsPath = join(dir, subpath + '.ts')
+                        try { await stat(fsPath); return fsPath } catch { }
+                        try { await stat(join(dir, subpath)); return join(dir, subpath) } catch { }
+                    } else if (pj.exports?.['.']) {
+                        const mainExport = pj.exports['.']
+                        if (typeof mainExport === 'string') {
+                            return pathResolve(dir, mainExport)
+                        }
+                    } else if (pj.main) {
+                        return pathResolve(dir, pj.main)
+                    }
+                }
+            } catch { }
+
+            // Check node_modules
             const candidate = join(dir, 'node_modules', uri)
             try {
                 const s = await stat(candidate)
