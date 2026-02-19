@@ -849,7 +849,7 @@ function extractModuleLocalCode(
         }
     }
 
-    // Also collect functions from the local scope around the call node
+    // Also collect functions and variables from the enclosing scope around the call node
     if (callNode) {
         let currentNode: ts.Node | undefined = callNode
         while (currentNode) {
@@ -858,6 +858,13 @@ function extractModuleLocalCode(
                     for (const statement of currentNode.body.statements) {
                         if (ts.isFunctionDeclaration(statement) && statement.name) {
                             moduleLocalFunctions.set(statement.name.text, statement)
+                        }
+                        if (ts.isVariableStatement(statement)) {
+                            for (const decl of statement.declarationList.declarations) {
+                                if (ts.isIdentifier(decl.name)) {
+                                    moduleLocalVariables.set(decl.name.text, decl)
+                                }
+                            }
                         }
                     }
                 }
@@ -925,7 +932,6 @@ function extractModuleLocalCode(
         if (varDecl) {
             // Analyze the variable to see if it's self-contained
             const varDependencies = analyzeVariableDependencies(varDecl, sourceFile, importMap, assignmentMap, moduleLocalFunctions, moduleLocalVariables)
-
             if (varDependencies.isContained) {
                 // Mark this as module-local in ambient references
                 refTyped.type = 'module-local'
@@ -939,6 +945,14 @@ function extractModuleLocalCode(
                     // Fallback to just the declaration
                     moduleLocalCode[name] = varDecl.getText(sourceFile)
                 }
+
+                // Recursively collect transitive variable dependencies
+                // (e.g., if appDir = join(baseDir, 'x'), also collect baseDir)
+                collectTransitiveVariableDependencies(
+                    varDecl, sourceFile, importMap, assignmentMap,
+                    moduleLocalFunctions, moduleLocalVariables,
+                    ambientReferences, moduleLocalCode
+                )
             }
         }
     }
@@ -960,6 +974,122 @@ function extractModuleLocalCode(
     }
 
     return moduleLocalCode
+}
+
+// Recursively collect transitive variable dependencies from a variable's initializer.
+// When a module-local variable references another module-local variable, collect that
+// dependency's code and add it to ambientReferences and moduleLocalCode.
+function collectTransitiveVariableDependencies(
+    varDecl: ts.VariableDeclaration,
+    sourceFile: ts.SourceFile,
+    importMap: Map<string, { importSpecifier: string, moduleUri: string }>,
+    assignmentMap: Map<string, { importSpecifier: string, moduleUri: string }>,
+    moduleLocalFunctions: Map<string, ts.FunctionDeclaration>,
+    moduleLocalVariables: Map<string, ts.VariableDeclaration>,
+    ambientReferences: Record<string, any>,
+    moduleLocalCode: Record<string, string>
+): void {
+    if (!varDecl.initializer) return
+
+    function visit(node: ts.Node) {
+        if (ts.isTypeNode(node)) return
+
+        if (ts.isIdentifier(node)) {
+            const name = node.text
+
+            // Skip special keywords
+            if (name === 'this' || name === 'undefined' || name === 'null' || name === 'arguments') return
+
+            // Skip property access names and property assignments
+            const parent = node.parent
+            if (parent && ts.isPropertyAccessExpression(parent) && parent.name === node) return
+            if (parent && ts.isPropertyAssignment(parent) && parent.name === node) return
+            if (parent && ts.isBindingElement(parent) && parent.propertyName === node) return
+
+            // Skip if already tracked
+            if (ambientReferences[name] || moduleLocalCode[name]) return
+
+            // Skip builtins
+            if (MODULE_GLOBAL_BUILTINS.has(name)) return
+
+            // Check if it's an import — add to ambient refs
+            const importInfo = importMap.get(name)
+            if (importInfo) {
+                if (!ambientReferences[name]) {
+                    ambientReferences[name] = {
+                        type: 'import',
+                        importSpecifier: importInfo.importSpecifier,
+                        moduleUri: importInfo.moduleUri
+                    }
+                }
+                return
+            }
+
+            // Check if it's an assignment from import
+            const assignmentInfo = assignmentMap.get(name)
+            if (assignmentInfo) {
+                if (!ambientReferences[name]) {
+                    ambientReferences[name] = {
+                        type: 'assigned',
+                        importSpecifier: assignmentInfo.importSpecifier,
+                        moduleUri: assignmentInfo.moduleUri
+                    }
+                }
+                return
+            }
+
+            // Check if it's another module-local variable — recursively collect
+            const depVarDecl = moduleLocalVariables.get(name)
+            if (depVarDecl) {
+                const depDependencies = analyzeVariableDependencies(depVarDecl, sourceFile, importMap, assignmentMap, moduleLocalFunctions, moduleLocalVariables)
+                if (depDependencies.isContained) {
+                    ambientReferences[name] = { type: 'module-local' }
+
+                    const depVarStatement = depVarDecl.parent?.parent
+                    if (depVarStatement && ts.isVariableStatement(depVarStatement)) {
+                        moduleLocalCode[name] = depVarStatement.getText(sourceFile)
+                    } else {
+                        moduleLocalCode[name] = depVarDecl.getText(sourceFile)
+                    }
+
+                    // Add import dependencies
+                    for (const [depName, depInfo] of depDependencies.importDependencies) {
+                        if (!ambientReferences[depName]) {
+                            ambientReferences[depName] = {
+                                type: 'import',
+                                importSpecifier: depInfo.importSpecifier,
+                                moduleUri: depInfo.moduleUri
+                            }
+                        }
+                    }
+
+                    // Recurse into this dependency's initializer
+                    collectTransitiveVariableDependencies(
+                        depVarDecl, sourceFile, importMap, assignmentMap,
+                        moduleLocalFunctions, moduleLocalVariables,
+                        ambientReferences, moduleLocalCode
+                    )
+                }
+                return
+            }
+
+            // Check if it's a module-local function
+            if (moduleLocalFunctions.has(name)) {
+                if (!ambientReferences[name]) {
+                    ambientReferences[name] = { type: 'module-local' }
+                }
+                if (!moduleLocalCode[name]) {
+                    const funcDecl = moduleLocalFunctions.get(name)!
+                    moduleLocalCode[name] = funcDecl.getText(sourceFile)
+                }
+                return
+            }
+        }
+
+        ts.forEachChild(node, visit)
+    }
+
+    visit(varDecl.initializer)
 }
 
 // Analyze if a function is self-contained (only depends on other module-local functions or builtins)
@@ -1250,7 +1380,7 @@ function extractCapsuleAmbientReferences(
         }
     }
 
-    // Find enclosing function and collect its parameters and local functions
+    // Find enclosing function and collect its parameters, local variables, and local functions
     let currentNode: ts.Node | undefined = call
     let enclosingBlock: ts.Block | undefined
     while (currentNode) {
@@ -1259,7 +1389,7 @@ function extractCapsuleAmbientReferences(
             for (const param of currentNode.parameters) {
                 extractParameterNames(param.name, invocationParameters)
             }
-            // Get the function body to collect local functions
+            // Get the function body to collect local functions and variables
             if (currentNode.body && ts.isBlock(currentNode.body)) {
                 enclosingBlock = currentNode.body
             }
@@ -1268,11 +1398,18 @@ function extractCapsuleAmbientReferences(
         currentNode = currentNode.parent
     }
 
-    // Collect function declarations from the enclosing block
+    // Collect function declarations and variable declarations from the enclosing block
     if (enclosingBlock) {
         for (const statement of enclosingBlock.statements) {
             if (ts.isFunctionDeclaration(statement) && statement.name) {
                 moduleLocalFunctions.set(statement.name.text, statement)
+            }
+            if (ts.isVariableStatement(statement)) {
+                for (const decl of statement.declarationList.declarations) {
+                    if (ts.isIdentifier(decl.name)) {
+                        moduleLocalVariables.set(decl.name.text, decl)
+                    }
+                }
             }
         }
     }
@@ -1541,7 +1678,7 @@ function extractAndValidateAmbientReferences(
     const localIdentifiers = new Set<string>()
     const invocationParameters = new Set<string>()
 
-    // Find enclosing function and collect its parameters as invocation arguments and local functions
+    // Find enclosing function and collect its parameters as invocation arguments and local functions/variables
     let currentNode: ts.Node | undefined = fn
     let enclosingBlock: ts.Block | undefined
     while (currentNode) {
@@ -1551,7 +1688,7 @@ function extractAndValidateAmbientReferences(
                 for (const param of currentNode.parameters) {
                     extractParameterNamesForInvocation(param.name, invocationParameters)
                 }
-                // Get the function body to collect local functions
+                // Get the function body to collect local functions and variables
                 if (currentNode.body && ts.isBlock(currentNode.body)) {
                     enclosingBlock = currentNode.body
                 }
@@ -1561,11 +1698,18 @@ function extractAndValidateAmbientReferences(
         currentNode = currentNode.parent
     }
 
-    // Collect function declarations from the enclosing block
+    // Collect function declarations and variable declarations from the enclosing block
     if (enclosingBlock) {
         for (const statement of enclosingBlock.statements) {
             if (ts.isFunctionDeclaration(statement) && statement.name) {
                 moduleLocalFunctions.set(statement.name.text, statement)
+            }
+            if (ts.isVariableStatement(statement)) {
+                for (const decl of statement.declarationList.declarations) {
+                    if (ts.isIdentifier(decl.name)) {
+                        moduleLocalVariables.set(decl.name.text, decl)
+                    }
+                }
             }
         }
     }
