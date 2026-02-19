@@ -214,6 +214,23 @@ export class ContractCapsuleInstanceFactory {
             }
         }
 
+        // Separate nested capsule-name-targeted options from own options
+        // Keys starting with '#' are own options for the mapped capsule
+        // Non-'#' keys are matched against capsule names in the mapping tree
+        let ownMappingOptions: Record<string, any> | undefined = undefined
+        let nestedCapsuleOptions: Record<string, any> | undefined = undefined
+        if (mappingOptions) {
+            for (const [key, value] of Object.entries(mappingOptions)) {
+                if (key.startsWith('#')) {
+                    if (!ownMappingOptions) ownMappingOptions = {}
+                    ownMappingOptions[key] = value
+                } else {
+                    if (!nestedCapsuleOptions) nestedCapsuleOptions = {}
+                    nestedCapsuleOptions[key] = value
+                }
+            }
+        }
+
         // Transform overrides if this mapping has a propertyContractDelegate
         let mappedOverrides = overrides
         if (property.definition.propertyContractDelegate) {
@@ -238,10 +255,22 @@ export class ContractCapsuleInstanceFactory {
             }
         }
 
+        // Merge nested capsule-name-targeted options into overrides
+        // These will be picked up when child capsules with matching names are instantiated
+        if (nestedCapsuleOptions) {
+            mappedOverrides = { ...mappedOverrides }
+            for (const [capsuleNameKey, capsuleOptions] of Object.entries(nestedCapsuleOptions)) {
+                mappedOverrides[capsuleNameKey] = {
+                    ...(mappedOverrides[capsuleNameKey] || {}),
+                    ...capsuleOptions
+                }
+            }
+        }
+
         const apiTarget = this.getApiTarget({ property })
         const mappedInstance = await mappedCapsule.makeInstance({
             overrides: mappedOverrides,
-            options: mappingOptions,
+            options: ownMappingOptions,
             runtimeSpineContracts: this.runtimeSpineContracts,
             rootCapsule: this.capsuleInstance?.rootCapsule
         })
