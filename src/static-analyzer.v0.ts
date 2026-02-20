@@ -1586,6 +1586,16 @@ function extractCapsuleAmbientReferences(
                     // Check if it's a module-local variable (const/let/var at module level)
                     const varDecl = moduleLocalVariables.get(identifierName)
                     if (varDecl) {
+                        // If the runtime value is a literal AND provided as an ambient reference,
+                        // prefer 'literal' classification — a `const x = 'foo'` is semantically a literal
+                        if (runtimeAmbientRefs && identifierName in runtimeAmbientRefs) {
+                            const value = runtimeAmbientRefs[identifierName]
+                            if (isLiteralType(value)) {
+                                ambientRefs[identifierName] = { type: 'literal', value }
+                                return
+                            }
+                        }
+
                         // Analyze the variable's initializer for dependencies
                         const varDependencies = analyzeVariableDependencies(varDecl, sourceFile, importMap, assignmentMap, moduleLocalFunctions, moduleLocalVariables)
 
