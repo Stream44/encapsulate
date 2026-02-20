@@ -25,13 +25,14 @@ Notes
 ---
 
 - The first spine contract is defined and implemented here: [src/spine-contracts/CapsuleSpineContract.v0/](src/spine-contracts/CapsuleSpineContract.v0/)
-- Projector reference implementations are here: [github.com/Stream44/ink-component-projector](https://github.com/Stream44/ink-component-projector)
 
 Roadmap
 ---
 
-- [ ] Document [src/spine-contracts/CapsuleSpineContract.v0/](src/spine-contracts/CapsuleSpineContract.v0/)
-- [ ] Private properties
+- [ ] Private/Projected properties
+- [ ] Property annotations
+- [ ] Capsule Projectors
+- [ ] Load capsules from packs
 
 
 Provenance
