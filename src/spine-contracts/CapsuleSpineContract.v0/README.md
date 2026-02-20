@@ -403,3 +403,7 @@ api['#@stream44.studio/encapsulate/structs/Capsule'] = {
 ```
 
 `capsuleSourceNameRefHash` is also available when static analysis is enabled.
+
+---
+
+(c) 2026 [Christoph.diy](https://christoph.diy) • Code: [MIT](../../LICENSE.txt) • Text: [GNU Free Documentation License](https://www.gnu.org/licenses/fdl-1.3.txt) • Created with [Stream44.Studio](https://Stream44.Studio)
