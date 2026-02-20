@@ -1,7 +1,7 @@
 
 // CACHE_BUST_VERSION: Increment this whenever CST cache must be invalidated due to structural changes
 // This ensures projected capsules are regenerated when the CST format changes
-const CACHE_BUST_VERSION = 9
+const CACHE_BUST_VERSION = 10
 
 type TSpineOptions = {
     spineFilesystemRoot?: string,
