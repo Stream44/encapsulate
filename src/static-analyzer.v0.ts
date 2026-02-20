@@ -270,6 +270,34 @@ export function StaticAnalyzer({
                 const readDuration = Date.now() - readStart
                 timing?.record(`StaticAnalyzer: Read file took ${readDuration}ms for ${encapsulateOptions.moduleFilepath}`)
 
+                // DEBUG: Log source file info for module-local test
+                if (moduleFilepath.includes('module-local')) {
+                    console.log(`[DEBUG-SOURCE] moduleFilepath: ${moduleFilepath}`)
+                    console.log(`[DEBUG-SOURCE] sourceCode length: ${sourceCode.length}`)
+                    console.log(`[DEBUG-SOURCE] first 300 chars: ${sourceCode.substring(0, 300)}`)
+                    // Check if 'const prefix' appears and at what indentation
+                    const lines = sourceCode.split('\n')
+                    for (let i = 0; i < lines.length; i++) {
+                        if (lines[i].includes('const prefix')) {
+                            const indent = lines[i].length - lines[i].trimStart().length
+                            console.log(`[DEBUG-SOURCE] 'const prefix' at line ${i + 1}, indent=${indent}: "${lines[i]}"`)
+                        }
+                    }
+                    // Count top-level statements
+                    const tmpSf = ts.createSourceFile(moduleFilepath, sourceCode, ts.ScriptTarget.Latest, true)
+                    console.log(`[DEBUG-SOURCE] top-level statement count: ${tmpSf.statements.length}`)
+                    for (const stmt of tmpSf.statements) {
+                        if (ts.isVariableStatement(stmt)) {
+                            for (const decl of stmt.declarationList.declarations) {
+                                if (ts.isIdentifier(decl.name) && decl.name.text === 'prefix') {
+                                    const stmtLine = tmpSf.getLineAndCharacterOfPosition(stmt.pos).line + 1
+                                    console.log(`[DEBUG-SOURCE] 'prefix' IS a top-level variable statement at line ${stmtLine}`)
+                                }
+                            }
+                        }
+                    }
+                }
+
                 // Parse with TypeScript
                 timing?.record(`StaticAnalyzer: About to parse with TypeScript ${encapsulateOptions.moduleFilepath}`)
                 const parseStart = Date.now()
@@ -1380,6 +1408,11 @@ function extractCapsuleAmbientReferences(
         }
     }
 
+    // DEBUG: Log module-level variables collected
+    if (moduleLocalVariables.has('prefix')) {
+        console.log('[DEBUG-AMBIENT] prefix found in module-level statements. moduleLocalVariables keys:', Array.from(moduleLocalVariables.keys()))
+    }
+
     // Find enclosing function and collect its parameters, local variables, and local functions
     let currentNode: ts.Node | undefined = call
     let enclosingBlock: ts.Block | undefined
@@ -1398,6 +1431,14 @@ function extractCapsuleAmbientReferences(
         currentNode = currentNode.parent
     }
 
+    // DEBUG: Log enclosing block info
+    if (enclosingBlock) {
+        const blockLine = sourceFile.getLineAndCharacterOfPosition(enclosingBlock.pos).line + 1
+        console.log('[DEBUG-AMBIENT] enclosingBlock found at line', blockLine, 'with', enclosingBlock.statements.length, 'statements')
+    } else {
+        console.log('[DEBUG-AMBIENT] no enclosingBlock found')
+    }
+
     // Collect function declarations and variable declarations from the enclosing block
     if (enclosingBlock) {
         for (const statement of enclosingBlock.statements) {
@@ -1412,6 +1453,11 @@ function extractCapsuleAmbientReferences(
                 }
             }
         }
+    }
+
+    // DEBUG: Log after enclosing block collection
+    if (moduleLocalVariables.has('prefix')) {
+        console.log('[DEBUG-AMBIENT] prefix found after enclosing block collection. moduleLocalVariables keys:', Array.from(moduleLocalVariables.keys()))
     }
 
     // Helper to extract parameter names from binding patterns
@@ -1583,23 +1629,27 @@ function extractCapsuleAmbientReferences(
                         }
                     }
 
-                    // Check if it's a module-local variable (const/let/var at module level)
+                    // Check if it's a module-local variable (const/let/var at module level or enclosing block)
                     const varDecl = moduleLocalVariables.get(identifierName)
                     if (varDecl) {
-                        // If the runtime value is a literal AND provided as an ambient reference,
-                        // prefer 'literal' classification — a `const x = 'foo'` is semantically a literal
-                        if (runtimeAmbientRefs && identifierName in runtimeAmbientRefs) {
-                            const value = runtimeAmbientRefs[identifierName]
-                            if (isLiteralType(value)) {
-                                ambientRefs[identifierName] = { type: 'literal', value }
-                                return
-                            }
+                        // DEBUG: Log when prefix is found in moduleLocalVariables
+                        if (identifierName === 'prefix') {
+                            const varLine = sourceFile.getLineAndCharacterOfPosition(varDecl.pos).line + 1
+                            const initKind = varDecl.initializer ? ts.SyntaxKind[varDecl.initializer.kind] : 'none'
+                            console.log(`[DEBUG-AMBIENT] prefix varDecl found at line ${varLine}, initializer kind: ${initKind}`)
+                            console.log(`[DEBUG-AMBIENT] runtimeAmbientRefs has prefix: ${!!(runtimeAmbientRefs && 'prefix' in runtimeAmbientRefs)}`)
+                            console.log(`[DEBUG-AMBIENT] localIdentifiers has prefix: ${localIdentifiers.has('prefix')}`)
+                            console.log(`[DEBUG-AMBIENT] invocationParameters has prefix: ${invocationParameters.has('prefix')}`)
                         }
 
                         // Analyze the variable's initializer for dependencies
                         const varDependencies = analyzeVariableDependencies(varDecl, sourceFile, importMap, assignmentMap, moduleLocalFunctions, moduleLocalVariables)
 
                         if (varDependencies.isContained) {
+                            // DEBUG
+                            if (identifierName === 'prefix') {
+                                console.log(`[DEBUG-AMBIENT] prefix classified as module-local (isContained=true)`)
+                            }
                             // Mark as module-local and add any import dependencies to ambientRefs
                             ambientRefs[identifierName] = {
                                 type: 'module-local'
