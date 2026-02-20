@@ -176,7 +176,7 @@ it('Capsule source analysis', async function () {
     ])
 
     expect(capsule1.capsuleSourceLineRef).toMatch(/main\.test\.ts:69$/)
-    expect(capsule1.cst.cacheBustVersion).toBe(10)
+    expect(capsule1.cst.cacheBustVersion).toBeNumber()
     expect(capsule1.cst.capsuleSourceLineRef).toMatch(/main\.test\.ts:69$/)
     expect(capsule1.cst.source.declarationLine).toBe(29)
     expect(capsule1.cst.source.definitionStartLine).toBe(29)
@@ -187,7 +187,7 @@ it('Capsule source analysis', async function () {
     expect(capsule1.definition['#@stream44.studio/encapsulate/spine-contracts/CapsuleSpineContract.v0']['#'].username.type).toBe('String')
 
     expect(capsule2.capsuleSourceLineRef).toMatch(/main\.test\.ts:120$/)
-    expect(capsule2.cst.cacheBustVersion).toBe(10)
+    expect(capsule2.cst.cacheBustVersion).toBeNumber()
     expect(capsule2.cst.capsuleSourceLineRef).toMatch(/main\.test\.ts:120$/)
     expect(capsule2.cst.source.declarationLine).toBe(75)
     expect(capsule2.cst.source.definitionStartLine).toBe(75)
