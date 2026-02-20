@@ -1,7 +1,7 @@
 
 // CACHE_BUST_VERSION: Increment this whenever CST cache must be invalidated due to structural changes
 // This ensures projected capsules are regenerated when the CST format changes
-const CACHE_BUST_VERSION = 11
+const CACHE_BUST_VERSION = 12
 
 type TSpineOptions = {
     spineFilesystemRoot?: string,
@@ -522,7 +522,8 @@ async function encapsulate(definition: TCapsuleDefinition, options: TCapsuleOpti
     }
 
     // Get capsuleName from options first, then fall back to CST if available
-    const cst = csts?.[capsuleSourceLineRef]
+    // When parseModule returns CSTs without this capsule (e.g. projected files), fall back to options.cst
+    const cst = csts?.[capsuleSourceLineRef] || options.cst
     const capsuleName = options.capsuleName || cst?.source?.capsuleName
 
     const encapsulateOptions: TEncapsulateOptions = {
@@ -711,13 +712,12 @@ async function encapsulate(definition: TCapsuleDefinition, options: TCapsuleOpti
                 // The selfProxy in spine contracts will expose this as 'self' property
                 const ownSelf = merge({}, defaultInstance, defaultPropertyValues, ...Object.values(mergedValuesByContract))
 
-                // Capsule metadata struct will be set on self/ownSelf AFTER spine contract processing
-                // to avoid being overwritten by the empty struct marker in the definition
                 // Convert relative paths to absolute for metadata exposure
                 const absoluteCapsuleSourceLineRef = `${absoluteModuleFilepath}:${importStackLine}`
-                const capsuleMetadataStruct = {
+                const capsuleMetadataStruct: Record<string, any> = {
                     capsuleName: encapsulateOptions.capsuleName,
                     capsuleSourceLineRef: absoluteCapsuleSourceLineRef,
+                    capsuleSourceNameRefHash: cst?.capsuleSourceNameRefHash,
                     moduleFilepath: absoluteModuleFilepath,
                     // Root capsule metadata will be populated after extends chain is resolved
                     rootCapsule: {
@@ -824,6 +824,14 @@ async function encapsulate(definition: TCapsuleDefinition, options: TCapsuleOpti
                     rootCapsule: resolvedRootCapsule
                 }
 
+                // Set capsule metadata struct on self early so it's available in options() callbacks during mapping
+                if (!self['#@stream44.studio/encapsulate/structs/Capsule'] ||
+                    typeof self['#@stream44.studio/encapsulate/structs/Capsule'] !== 'object' ||
+                    !self['#@stream44.studio/encapsulate/structs/Capsule'].capsuleName) {
+                    self['#@stream44.studio/encapsulate/structs/Capsule'] = capsuleMetadataStruct
+                }
+                ownSelf['#@stream44.studio/encapsulate/structs/Capsule'] = capsuleMetadataStruct
+
                 // Use runtime spine contracts if provided, otherwise fall back to encapsulation spine contracts
                 const activeSpineContracts = runtimeSpineContracts || spine.spineContracts
 
@@ -853,10 +861,18 @@ async function encapsulate(definition: TCapsuleDefinition, options: TCapsuleOpti
                         if (propertyContractUri !== '#') {
                             continue
                         }
+                        // Get CST property definitions for this spine contract to merge depends
+                        const cstProperties = cst?.spineContracts?.[spineContractUri]?.properties?.[propertyContractUri]?.properties
+
                         for (const [propertyName, propertyDefinition] of Object.entries(properties)) {
 
                             if (!propertyDefinition.type || !(propertyDefinition.type in CapsulePropertyTypes)) throw new Error(`Type '${propertyDefinition.type}' for property '${propertyName}' on spineContract '${spineContractUri}' not set or supported!`)
 
+                            // Merge CST depends into property definition (CST is authoritative)
+                            const cstDepends = cstProperties?.[propertyName]?.depends
+                            if (cstDepends && !propertyDefinition.depends) {
+                                propertyDefinition.depends = cstDepends
+                            }
                             await spineContractCapsuleInstance.mapProperty({
                                 overrides,
                                 options,
@@ -866,17 +882,17 @@ async function encapsulate(definition: TCapsuleDefinition, options: TCapsuleOpti
                                     propertyContractUri
                                 }
                             })
+
+                            // Re-set capsule metadata after the Capsule struct delegate mapping overwrites self
+                            if (propertyDefinition.propertyContractDelegate === '#@stream44.studio/encapsulate/structs/Capsule') {
+                                self[propertyName] = capsuleMetadataStruct
+                            }
                         }
                     }
                 }
 
-                // Set capsule metadata struct on self/ownSelf AFTER spine contract processing
-                // to avoid being overwritten by the empty struct marker in the definition
-                if (!self['#@stream44.studio/encapsulate/structs/Capsule'] ||
-                    typeof self['#@stream44.studio/encapsulate/structs/Capsule'] !== 'object' ||
-                    !self['#@stream44.studio/encapsulate/structs/Capsule'].capsuleName) {
-                    self['#@stream44.studio/encapsulate/structs/Capsule'] = capsuleMetadataStruct
-                }
+                // Ensure capsule metadata struct is set on ownSelf after spine contract processing
+                // (self may have been updated by the extends chain; ownSelf always reflects this capsule)
                 ownSelf['#@stream44.studio/encapsulate/structs/Capsule'] = capsuleMetadataStruct
 
                 // Collect lifecycle functions and mapped capsule instances from all spine contract capsule instances

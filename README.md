@@ -21,18 +21,24 @@ It is being used to underpin:
   <br/><br/>
 </p>
 
-Notes
+The CAPSULE Spine Contract
 ---
 
-- The first spine contract is defined and implemented here: [src/spine-contracts/CapsuleSpineContract.v0/](src/spine-contracts/CapsuleSpineContract.v0/)
+The `encapsulate` library wraps TypeScript objects and binds reference trees for constructing executable component graphs.
 
-Roadmap
----
+The binding rules are defined by **Spine Contracts**. The first *experimental* spine contract is the **Capsule Spine Contract**. It builds a model
+around **Capsules** which have certain properties.
+
+The capsule spine contract is implemented here: [src/spine-contracts/CapsuleSpineContract.v0/](src/spine-contracts/CapsuleSpineContract.v0/)
+
+### Roadmap
 
 - [ ] Private/Projected properties
 - [ ] Property annotations
 - [ ] Capsule Projectors
 - [ ] Load capsules from packs
+
+![Capsule Spine Contract Overview](./src/spine-contracts/CapsuleSpineContract.v0/Overview.svg)
 
 
 Provenance

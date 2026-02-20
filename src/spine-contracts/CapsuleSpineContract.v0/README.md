@@ -16,6 +16,8 @@ In practice there should only ever be very few spine contracts but there can be 
 
 This spine contract aims to realize a concrete implementation of the [PrivateData.Space](https://privatedata.space/) model for the purpose of building full-stack distributed JavaScript applications & systems.
 
+![Capsule Spine Contract Overview](./Overview.svg)
+
 
 Example Capsule Source
 ---
@@ -124,14 +126,33 @@ const userService = await encapsulate({
             $db: {
                 type: CapsulePropertyTypes.Mapping,
                 value: './Database.v0', // resolved via spine contract's resolve + importCapsule
-                options: async ({ constants }: { constants: any }) => {
-                    // Dynamic options function — receives Literal/String constants from the mapped capsule.
+                options: async ({ self, constants }: { self: any, constants: any }) => {
+                    // Dynamic options function — receives { self, constants }.
+                    // 'constants' contains Literal/String values from the mapped capsule.
+                    // 'self' contains resolved sibling mappings when depends is declared.
                     return {
                         '#': { connectionString: `db://${constants.dbName}` },
                         // Nested capsule-name-targeted options: keys without '#' prefix
                         // are matched against capsule names deeper in the mapping tree.
                         'connectionPool': {
                             '#': { maxConnections: 10 }
+                        }
+                    }
+                }
+            },
+
+            // Mapping with depends: declares sibling dependencies that must resolve first.
+            // options({ self }) receives the parent capsule's self with resolved siblings.
+            // The static analyzer can auto-detect self.<name> references and inject depends.
+            $api: {
+                type: CapsulePropertyTypes.Mapping,
+                value: apiCapsule,
+                depends: ['$auth'],     // explicit depends — ensures $auth is resolved first
+                options: function ({ self }: { self: any }) {
+                    return {
+                        '#': {
+                            authRealm: self.$auth.realm,
+                            capsuleName: self['#@stream44.studio/encapsulate/structs/Capsule'].capsuleName
                         }
                     }
                 }
@@ -187,7 +208,7 @@ const userService = await encapsulate({
     importStack: makeImportStack(),
     capsuleName: 'UserService',             // optional name — enables override targeting by name
     extendsCapsule: baseCapsule,            // inherits properties from another capsule (reference or string URI)
-    ambientReferences: { authCapsule }      // capsules referenced in the definition that need CST tracking
+    ambientReferences: { authCapsule, apiCapsule } // capsules referenced in the definition that need CST tracking
 })
 ```
 
@@ -277,14 +298,18 @@ Memoize caches are scoped per spine contract capsule instance and cleared automa
 prop: {
     type: CapsulePropertyTypes.Mapping,
     value: capsuleRef | './relative/path',
-    options: { '#': { key: value } }                          // static object
-    options: async ({ constants }) => ({ '#': { ... } })      // dynamic function
+    options: { '#': { key: value } }                                    // static object
+    options: async ({ self, constants }) => ({ '#': { ... } })          // dynamic function
+    depends: ['siblingPropName']                                        // optional
 }
 ```
 
 - **`value`** — a capsule reference (from `encapsulate()`) or a string URI resolved relative to the current module.
 - **`options`** — forwarded to the mapped capsule. Keys starting with `'#'` target the mapped capsule's own property contracts. Keys without `'#'` are matched against capsule names deeper in the mapping tree (nested capsule-name-targeted options).
-- **`constants`** — when `options` is a function, it receives `{ constants }` containing all `Literal`/`String` values from the mapped capsule's definition. Useful for deriving options from the target's defaults.
+- **`options({ self, constants })`** — when `options` is a function, it receives `{ self, constants }`.
+  - `constants` — all `Literal`/`String` values from the mapped capsule's definition.
+  - `self` — the parent capsule's `self` object with resolved sibling mappings. Only populated when `depends` is specified (empty `{}` otherwise).
+- **`depends`** — array of sibling property names that must be resolved before this mapping's `options` function runs. Enables `options({ self })` to access already-resolved siblings (e.g. `self.$auth.realm`) and the Capsule metadata struct (e.g. `self['#@stream44.studio/encapsulate/structs/Capsule'].capsuleName`). Can be declared explicitly or auto-injected by the static analyzer when it detects `self.<name>` references in the options function body.
 - **Instance reuse** — named capsules are registered in an instance registry. If a capsule with the same name is mapped multiple times without options, the existing instance is reused via a deferred proxy.
 
 Mapped capsules are accessible via `this.<prop>` (unwrapped API) and `api.<prop>` (raw instance with `.api`).

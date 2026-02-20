@@ -98,6 +98,32 @@ const MODULE_GLOBAL_BUILTINS = new Set([
     'Request',
     'Response',
     'Headers',
+    'AbortController',
+    'AbortSignal',
+    'FormData',
+    'Blob',
+    'File',
+
+    // Streams API
+    'ReadableStream',
+    'WritableStream',
+    'TransformStream',
+    'ByteLengthQueuingStrategy',
+    'CountQueuingStrategy',
+
+    // Events
+    'Event',
+    'EventTarget',
+    'CustomEvent',
+    'MessageEvent',
+    'ErrorEvent',
+    'CloseEvent',
+
+    // Web APIs
+    'WebSocket',
+    'MessageChannel',
+    'MessagePort',
+    'BroadcastChannel',
 
     // Crypto
     'crypto',
@@ -521,6 +547,20 @@ export function StaticAnalyzer({
                                                                                     importMap,
                                                                                     assignmentMap
                                                                                 )
+                                                                            }
+                                                                        } else if (fieldName === 'options') {
+                                                                            // Detect self.<name> references in options function to auto-inject depends
+                                                                            if (ts.isFunctionExpression(fieldValue) || ts.isArrowFunction(fieldValue)) {
+                                                                                const optionsText = fieldValue.getText(sourceFile)
+                                                                                const selfRefs = new Set<string>()
+                                                                                const selfRefPattern = /self\.(\w+)/g
+                                                                                let match
+                                                                                while ((match = selfRefPattern.exec(optionsText)) !== null) {
+                                                                                    selfRefs.add(match[1])
+                                                                                }
+                                                                                if (selfRefs.size > 0) {
+                                                                                    propDef.depends = Array.from(selfRefs)
+                                                                                }
                                                                             }
                                                                         } else if (fieldName === 'kind') {
                                                                             propDef.kind = fieldValue.getText(sourceFile)
@@ -1510,6 +1550,11 @@ function extractCapsuleAmbientReferences(
                 return
             }
 
+            // Skip if it's a method name in an object literal (shorthand method declaration)
+            if (parent && ts.isMethodDeclaration(parent) && parent.name === node) {
+                return
+            }
+
             // Skip if it's a property name in a destructuring binding pattern
             // e.g., const { encryptString: encryptFn } = await import('...')
             // 'encryptString' is the propertyName, 'encryptFn' is the binding name
@@ -1798,9 +1843,9 @@ function extractAndValidateAmbientReferences(
             localIdentifiers.add(node.name.text)
         }
 
-        // Track parameters from nested arrow functions and function expressions
+        // Track parameters from nested arrow functions, function expressions, and method declarations
         // This prevents false positives where callback parameters are treated as ambient references
-        if (ts.isArrowFunction(node) || ts.isFunctionExpression(node)) {
+        if (ts.isArrowFunction(node) || ts.isFunctionExpression(node) || ts.isMethodDeclaration(node)) {
             for (const param of node.parameters) {
                 extractBindingIdentifiers(param.name)
             }
@@ -1849,6 +1894,11 @@ function extractAndValidateAmbientReferences(
 
             // Skip if it's a property name in an object literal
             if (parent && ts.isPropertyAssignment(parent) && parent.name === node) {
+                return
+            }
+
+            // Skip if it's a method name in an object literal (shorthand method declaration)
+            if (parent && ts.isMethodDeclaration(parent) && parent.name === node) {
                 return
             }
 
