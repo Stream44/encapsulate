@@ -342,7 +342,7 @@ run: {
 - Init lifecycle functions are executed on the imported capsule instance before returning.
 - The imported capsule is **not** registered in the instance registry and **not** mounted on the parent's API or `self`.
 
-Use `importCapsule` when you need to work with arbitrary capsules determined at runtime (e.g. provider plugins referenced in configuration) without declaring them all upfront as `Mapping` properties.
+Use `importCapsule` when you need to work with arbitrary capsules determined at runtime without declaring them all upfront as `Mapping` properties.
 
 ### Property Contract Delegates
 
