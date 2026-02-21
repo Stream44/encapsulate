@@ -1,6 +1,6 @@
 MIT License
 
-encapsulate: An experimental implementation of the https://PrivateData.Space model in TypeScript.
+Object encapsulation & mapping system with runtime kernel for TypeScript
 
 Copyright 2026 Christoph Dorn - https://Christoph.diy
 

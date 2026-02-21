@@ -40,6 +40,42 @@ export class ContractCapsuleInstanceFactory {
         this.extendedCapsuleInstance = extendedCapsuleInstance
         this.runtimeSpineContracts = runtimeSpineContracts
         this.capsuleInstance = capsuleInstance
+
+        // Inject importCapsule onto ownSelf so capsule functions can call this.self.importCapsule()
+        if (ownSelf && !ownSelf.importCapsule) {
+            ownSelf.importCapsule = this.handleImportCapsule.bind(this)
+        }
+    }
+
+    async handleImportCapsule({ uri, options, overrides }: { uri: string, options?: Record<string, any>, overrides?: Record<string, any> }): Promise<{ capsule: any, api: any }> {
+        // Resolve the URI to a capsule object using the same mechanism as mappings
+        const resolvedCapsule = await this.resolveMappedCapsule({
+            property: {
+                name: '__importCapsule__',
+                definition: { value: uri }
+            }
+        })
+
+        // Instantiate the capsule with the caller's runtime spine contracts and optional overrides/options
+        const instance = await resolvedCapsule.makeInstance({
+            overrides: overrides || {},
+            options: options,
+            runtimeSpineContracts: this.runtimeSpineContracts,
+            rootCapsule: this.capsuleInstance?.rootCapsule
+        })
+
+        // Run init functions on the imported capsule instance
+        if (instance.initFunctions?.length) {
+            for (const fn of instance.initFunctions) {
+                await fn()
+            }
+        }
+
+        // Return capsule and unwrapped api without mapping onto the parent
+        return {
+            capsule: resolvedCapsule,
+            api: instance.api || instance
+        }
     }
 
     async mapProperty({ overrides, options, property }: { overrides: any, options: any, property: any }) {

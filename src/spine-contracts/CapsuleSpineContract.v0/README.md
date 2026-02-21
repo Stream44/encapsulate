@@ -314,6 +314,36 @@ prop: {
 
 Mapped capsules are accessible via `this.<prop>` (unwrapped API) and `api.<prop>` (raw instance with `.api`).
 
+### importCapsule
+
+`this.self.importCapsule()` dynamically loads and initializes a capsule by URI at runtime — without pre-declaring it as a `Mapping` property. The imported capsule is **not** mapped onto the parent capsule's API.
+
+```ts
+run: {
+    type: CapsulePropertyTypes.Function,
+    value: async function (this: any) {
+        const { capsule, api } = await this.self.importCapsule({
+            uri: '@scope/package/caps/MyCapsule',   // or './relative/path'
+            options: { '#': { key: 'value' } },     // optional — forwarded to makeInstance
+            overrides: { ... }                       // optional — forwarded to makeInstance
+        })
+
+        // Use the imported capsule's API directly
+        await api.doSomething()
+    }
+}
+```
+
+- **`uri`** — a string URI resolved using the same mechanism as `Mapping` values (relative paths, `@scope/package/path`, etc.).
+- **`options`** — forwarded to the imported capsule's `makeInstance()`. Same structure as mapping options.
+- **`overrides`** — forwarded to the imported capsule's `makeInstance()`. Same structure as runtime overrides.
+- **Returns** `{ capsule, api }` — the resolved capsule object and its initialized API.
+- The imported capsule receives the caller's runtime spine contracts and root capsule context.
+- Init lifecycle functions are executed on the imported capsule instance before returning.
+- The imported capsule is **not** registered in the instance registry and **not** mounted on the parent's API or `self`.
+
+Use `importCapsule` when you need to work with arbitrary capsules determined at runtime (e.g. provider plugins referenced in configuration) without declaring them all upfront as `Mapping` properties.
+
 ### Property Contract Delegates
 
 Non-default property contract URIs (e.g. `'#./MyStruct.v0'`) are resolved as capsule mappings and automatically mounted.
