@@ -486,13 +486,31 @@ export async function CapsuleSpineFactory({
             timing,
             cacheStore: {
                 writeFile: async (filepath: string, content: string) => {
-                    filepath = join(spineFilesystemRoot, '.~o/encapsulate.dev/static-analysis', filepath)
-                    await mkdir(dirname(filepath), { recursive: true })
-                    await writeFile(filepath, content, 'utf-8')
+                    // Write to central cache (spineFilesystemRoot)
+                    const centralPath = join(spineFilesystemRoot, '.~o/encapsulate.dev/static-analysis', filepath)
+                    await mkdir(dirname(centralPath), { recursive: true })
+                    await writeFile(centralPath, content, 'utf-8')
+                    // Also write to local project cache if available
+                    if (capsuleModuleProjectionRoot) {
+                        try {
+                            const localPath = join(capsuleModuleProjectionRoot, '.~o/encapsulate.dev/static-analysis', filepath)
+                            await mkdir(dirname(localPath), { recursive: true })
+                            await writeFile(localPath, content, 'utf-8')
+                        } catch { /* local write is best-effort */ }
+                    }
                 },
                 readFile: async (filepath: string) => {
-                    filepath = join(spineFilesystemRoot, '.~o/encapsulate.dev/static-analysis', filepath)
-                    return readFile(filepath, 'utf-8')
+                    const centralPath = join(spineFilesystemRoot, '.~o/encapsulate.dev/static-analysis', filepath)
+                    const content = await readFile(centralPath, 'utf-8')
+                    // Sync to local project cache on read (covers cache-hit paths)
+                    if (content && capsuleModuleProjectionRoot) {
+                        try {
+                            const localPath = join(capsuleModuleProjectionRoot, '.~o/encapsulate.dev/static-analysis', filepath)
+                            await mkdir(dirname(localPath), { recursive: true })
+                            await writeFile(localPath, content, 'utf-8')
+                        } catch { /* local sync is best-effort */ }
+                    }
+                    return content
                 },
                 getStats: async (filepath: string) => {
                     filepath = join(spineFilesystemRoot, '.~o/encapsulate.dev/static-analysis', filepath)

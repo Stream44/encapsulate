@@ -116,8 +116,8 @@ export function CapsuleModuleProjector({
     // Helper: Find custom projection path from property names starting with '/'
     function findCustomProjectionPath(capsule: any, spineContractUri: string): string | null {
         const spineContract = capsule.cst.spineContracts[spineContractUri]
-        if (spineContract?.properties) {
-            for (const propName in spineContract.properties) {
+        if (spineContract?.propertyContracts) {
+            for (const propName in spineContract.propertyContracts) {
                 if (propName.startsWith('/')) {
                     return propName.substring(1) // Remove leading '/'
                 }
@@ -131,10 +131,10 @@ export function CapsuleModuleProjector({
         const mapped: Array<{ capsuleHash: string, projectionPath: string, capsule: any }> = []
         const spineContract = capsule.cst.spineContracts[spineContractUri]
 
-        if (spineContract?.properties) {
-            for (const propName in spineContract.properties) {
+        if (spineContract?.propertyContracts) {
+            for (const propName in spineContract.propertyContracts) {
                 if (propName.startsWith('/')) {
-                    const prop = spineContract.properties[propName]
+                    const prop = spineContract.propertyContracts[propName]
                     // Check if this is a Mapping type property
                     if (prop.type === 'CapsulePropertyTypes.Mapping') {
                         // First try to find the mapped capsule in ambient references
@@ -178,7 +178,7 @@ export function CapsuleModuleProjector({
                 }
                 // Also check nested property contracts that start with '#'
                 if (propName.startsWith('#')) {
-                    const propContract = spineContract.properties[propName] as any
+                    const propContract = spineContract.propertyContracts[propName] as any
                     if (propContract?.properties) {
                         for (const nestedPropName in propContract.properties) {
                             if (nestedPropName.startsWith('/')) {
@@ -264,8 +264,8 @@ export function CapsuleModuleProjector({
         }
 
         const spineContract = capsule.cst.spineContracts[spineContractUri]
-        if (spineContract?.properties) {
-            traverseProperties(spineContract.properties)
+        if (spineContract?.propertyContracts) {
+            traverseProperties(spineContract.propertyContracts)
         }
 
         return uris
@@ -275,8 +275,8 @@ export function CapsuleModuleProjector({
     function hasSolidJsProperty(capsule: any, spineContractUri: string): boolean {
         const spineContract = capsule.cst.spineContracts[spineContractUri]
         // Check both top-level and nested under '#' property contract
-        const topLevelProps = spineContract?.properties || {}
-        const nestedProps = spineContract?.properties?.['#']?.properties || {}
+        const topLevelProps = spineContract?.propertyContracts || {}
+        const nestedProps = spineContract?.propertyContracts?.['#']?.properties || {}
 
         // Check for solidjs.com/standalone specifically
         for (const key of Object.keys(topLevelProps)) {
@@ -292,8 +292,8 @@ export function CapsuleModuleProjector({
     function hasStandaloneProperty(capsule: any, spineContractUri: string): boolean {
         const spineContract = capsule.cst.spineContracts[spineContractUri]
         // Check both top-level and nested under '#' property contract
-        const topLevelProps = spineContract?.properties || {}
-        const nestedProps = spineContract?.properties?.['#']?.properties || {}
+        const topLevelProps = spineContract?.propertyContracts || {}
+        const nestedProps = spineContract?.propertyContracts?.['#']?.properties || {}
 
         // Check for exact match or with suffix
         for (const key of Object.keys(topLevelProps)) {
@@ -310,8 +310,8 @@ export function CapsuleModuleProjector({
         const spineContract = capsule.cst.spineContracts[spineContractUri]
 
         // Check nested under '#' property contract first, looking for solidjs.com/standalone
-        const nestedProps = spineContract?.properties?.['#']?.properties || {}
-        const topLevelProps = spineContract?.properties || {}
+        const nestedProps = spineContract?.propertyContracts?.['#']?.properties || {}
+        const topLevelProps = spineContract?.propertyContracts || {}
 
         let solidjsProp = null
         for (const key of Object.keys(nestedProps)) {
@@ -370,8 +370,8 @@ export function CapsuleModuleProjector({
         const spineContract = capsule.cst.spineContracts[spineContractUri]
 
         // Check nested under '#' property contract first, looking for encapsulate.dev/standalone or encapsulate.dev/standalone/*
-        const nestedProps = spineContract?.properties?.['#']?.properties || {}
-        const topLevelProps = spineContract?.properties || {}
+        const nestedProps = spineContract?.propertyContracts?.['#']?.properties || {}
+        const topLevelProps = spineContract?.propertyContracts || {}
 
         let standaloneProp = null
         for (const key of Object.keys(nestedProps)) {
@@ -503,7 +503,7 @@ export function CapsuleModuleProjector({
 
         // Only project capsules that have the Capsule struct property
         const spineContract = capsule.cst.spineContracts[spineContractUri]
-        if (!spineContract?.properties?.['#@stream44.studio/encapsulate/structs/Capsule']) {
+        if (!spineContract?.propertyContracts?.['#@stream44.studio/encapsulate/structs/Capsule']) {
             return false
         }
 
@@ -571,11 +571,11 @@ export function CapsuleModuleProjector({
                         if (potentialMappedCapsule === capsule) continue
 
                         // Check if this capsule has the Capsule struct (meaning it should be projected)
-                        if (potentialMappedCapsule.cst?.spineContracts?.[spineContractUri]?.properties?.['#@stream44.studio/encapsulate/structs/Capsule']) {
+                        if (potentialMappedCapsule.cst?.spineContracts?.[spineContractUri]?.propertyContracts?.['#@stream44.studio/encapsulate/structs/Capsule']) {
                             // Check if this capsule's moduleFilepath is referenced in any mapping property
                             const mappedModulePath = potentialMappedCapsule.cst.source.moduleFilepath
 
-                            for (const [propContractKey, propContract] of Object.entries(spineContract.properties)) {
+                            for (const [propContractKey, propContract] of Object.entries(spineContract.propertyContracts)) {
                                 if (propContractKey.startsWith('#') && (propContract as any).properties) {
                                     for (const [propName, propDef] of Object.entries((propContract as any).properties)) {
                                         const prop = propDef as any

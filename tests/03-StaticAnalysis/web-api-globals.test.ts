@@ -42,7 +42,7 @@ describe('Web API globals in capsule property functions', () => {
 
         // Verify AbortSignal is recorded as module-global in the property's ambient references
         const cst = (capsule1 as any).cst
-        const propDef = cst.spineContracts['#@stream44.studio/encapsulate/spine-contracts/CapsuleSpineContract.v0'].properties['#'].properties.fetchWithTimeout
+        const propDef = cst.spineContracts['#@stream44.studio/encapsulate/spine-contracts/CapsuleSpineContract.v0'].propertyContracts['#'].properties.fetchWithTimeout
         expect(propDef.ambientReferences).toBeDefined()
         expect(propDef.ambientReferences.AbortSignal).toBeDefined()
         expect(propDef.ambientReferences.AbortSignal.type).toBe('module-global')
@@ -86,7 +86,7 @@ describe('Web API globals in capsule property functions', () => {
         expect(capsule1).toBeDefined()
 
         const cst = (capsule1 as any).cst
-        const propDef = cst.spineContracts['#@stream44.studio/encapsulate/spine-contracts/CapsuleSpineContract.v0'].properties['#'].properties.makeStream
+        const propDef = cst.spineContracts['#@stream44.studio/encapsulate/spine-contracts/CapsuleSpineContract.v0'].propertyContracts['#'].properties.makeStream
         expect(propDef.ambientReferences).toBeDefined()
         expect(propDef.ambientReferences.ReadableStream).toBeDefined()
         expect(propDef.ambientReferences.ReadableStream.type).toBe('module-global')

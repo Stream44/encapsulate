@@ -1,7 +1,7 @@
 
 // CACHE_BUST_VERSION: Increment this whenever CST cache must be invalidated due to structural changes
 // This ensures projected capsules are regenerated when the CST format changes
-const CACHE_BUST_VERSION = 12
+const CACHE_BUST_VERSION = 18
 
 type TSpineOptions = {
     spineFilesystemRoot?: string,
@@ -614,9 +614,13 @@ async function encapsulate(definition: TCapsuleDefinition, options: TCapsuleOpti
                                     propertyContractDefinitions[spineContractUri]['#'] = {}
                                 }
 
+                                // Look up capsule object from spine registry if available (for inline capsule refs)
+                                const delegateUri = propContractUri.substring(1)
+                                const delegateCapsuleObj = spine.capsules[delegateUri]
+
                                 propertyContractDefinitions[spineContractUri]['#'][contractKey] = {
                                     type: CapsulePropertyTypes.Mapping,
-                                    value: propContractUri.substring(1),
+                                    value: delegateCapsuleObj || delegateUri,
                                     propertyContractDelegate: propContractUri,
                                     as: aliasName,
                                     // Pass options from the property contract delegate to the mapped capsule
@@ -734,23 +738,34 @@ async function encapsulate(definition: TCapsuleDefinition, options: TCapsuleOpti
                 // Check CST first, then fall back to encapsulateOptions for direct capsule references
                 let extendsCapsuleValue = capsule.cst?.source?.extendsCapsule || encapsulateOptions.extendsCapsule
 
-                // If extendsCapsule is a string identifier, check if it's in ambientReferences first
+                // If extendsCapsule is a string identifier, resolve from ambient references
                 if (typeof extendsCapsuleValue === 'string') {
                     const cstAmbientRefs = capsule.cst?.source?.ambientReferences || {}
                     const runtimeAmbientRefs = encapsulateOptions.ambientReferences || {}
-                    for (const [refName, ref] of Object.entries(cstAmbientRefs)) {
-                        const refTyped = ref as any
-                        if (refName === extendsCapsuleValue) {
-                            if (refTyped.type === 'capsule' && refTyped.value) {
-                                extendsCapsuleValue = refTyped.value
-                            } else if (refTyped.type === 'instance' && runtimeAmbientRefs[refName]) {
-                                // CST stores '[instance]' placeholder; resolve from runtime ambient refs
-                                const runtimeRef = runtimeAmbientRefs[refName]
-                                if (runtimeRef && typeof runtimeRef === 'object' && typeof runtimeRef.makeInstance === 'function') {
-                                    extendsCapsuleValue = runtimeRef
+
+                    // First: try runtime ambient refs directly (capsule objects with .makeInstance)
+                    if (runtimeAmbientRefs[extendsCapsuleValue]) {
+                        const runtimeRef = runtimeAmbientRefs[extendsCapsuleValue]
+                        if (runtimeRef && typeof runtimeRef === 'object' && typeof runtimeRef.makeInstance === 'function') {
+                            extendsCapsuleValue = runtimeRef
+                        }
+                    }
+
+                    // Second: try CST ambient refs if still a string
+                    if (typeof extendsCapsuleValue === 'string') {
+                        for (const [refName, ref] of Object.entries(cstAmbientRefs)) {
+                            const refTyped = ref as any
+                            if (refName === extendsCapsuleValue) {
+                                if (refTyped.type === 'capsule' && refTyped.value) {
+                                    extendsCapsuleValue = refTyped.value
+                                } else if (refTyped.type === 'instance' && runtimeAmbientRefs[refName]) {
+                                    const runtimeRef = runtimeAmbientRefs[refName]
+                                    if (runtimeRef && typeof runtimeRef === 'object' && typeof runtimeRef.makeInstance === 'function') {
+                                        extendsCapsuleValue = runtimeRef
+                                    }
                                 }
+                                break
                             }
-                            break
                         }
                     }
                 }
@@ -862,7 +877,7 @@ async function encapsulate(definition: TCapsuleDefinition, options: TCapsuleOpti
                             continue
                         }
                         // Get CST property definitions for this spine contract to merge depends
-                        const cstProperties = cst?.spineContracts?.[spineContractUri]?.properties?.[propertyContractUri]?.properties
+                        const cstProperties = cst?.spineContracts?.[spineContractUri]?.propertyContracts?.[propertyContractUri]?.properties
 
                         for (const [propertyName, propertyDefinition] of Object.entries(properties)) {
 

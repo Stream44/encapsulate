@@ -335,7 +335,7 @@ class MembraneContractCapsuleInstanceFactory extends ContractCapsuleInstanceFact
             // This avoids triggering the proxy and firing unwanted membrane events
             const delegateTarget = this.encapsulatedApi[property.definition.propertyContractDelegate]
             const mappedCapsuleCst = mappedCapsule.cst
-            const spineContractProperties = mappedCapsuleCst?.spineContracts?.[this.spineContractUri]?.properties
+            const spineContractProperties = mappedCapsuleCst?.spineContracts?.[this.spineContractUri]?.propertyContracts
 
             if (spineContractProperties) {
                 for (const [key, propDef] of Object.entries(spineContractProperties)) {

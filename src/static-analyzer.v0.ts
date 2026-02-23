@@ -422,6 +422,17 @@ export function StaticAnalyzer({
                                     // Check if it's a string literal (relative path or npm URI)
                                     if (ts.isStringLiteral(prop.initializer)) {
                                         cst.source.extendsCapsule = prop.initializer.text
+                                        // Resolve to npm URI
+                                        const extendsValue = prop.initializer.text
+                                        if (extendsValue.startsWith('./') || extendsValue.startsWith('../')) {
+                                            const resolvedPath = resolve(dirname(moduleFilepath), extendsValue)
+                                            const extendsNpmUri = await constructNpmUri(resolvedPath + '.ts', spineOptions.spineFilesystemRoot)
+                                            if (extendsNpmUri) {
+                                                cst.source.extendsCapsuleUri = extendsNpmUri.replace(/\.(ts|tsx|js|jsx)$/, '')
+                                            }
+                                        } else if (extendsValue.startsWith('@')) {
+                                            cst.source.extendsCapsuleUri = extendsValue
+                                        }
                                     }
                                     // Check if it's an identifier (capsule variable reference)
                                     else if (ts.isIdentifier(prop.initializer)) {
@@ -460,13 +471,36 @@ export function StaticAnalyzer({
 
                                 if (ts.isObjectLiteralExpression(spineContractValue)) {
                                     const spineContractDef: any = {
-                                        properties: {}
+                                        propertyContracts: {}
                                     }
 
                                     // Parse properties within the spineContract
                                     for (const prop of spineContractValue.properties) {
+                                        let propName: string | null = null
                                         if (ts.isPropertyAssignment(prop) && (ts.isIdentifier(prop.name) || ts.isStringLiteral(prop.name))) {
-                                            const propName = ts.isIdentifier(prop.name) ? prop.name.text : (prop.name as ts.StringLiteral).text
+                                            propName = ts.isIdentifier(prop.name) ? prop.name.text : (prop.name as ts.StringLiteral).text
+                                        }
+                                        // Handle computed property names like ['#' + capsule.capsuleSourceLineRef]
+                                        else if (ts.isPropertyAssignment(prop) && ts.isComputedPropertyName(prop.name)) {
+                                            const computedText = prop.name.expression.getText(sourceFile)
+                                            // Pattern: '#' + <identifier>.capsuleSourceLineRef
+                                            const capsuleRefMatch = computedText.match(/['"]#['"] \+ (\w+)\.capsuleSourceLineRef/)
+                                            if (capsuleRefMatch) {
+                                                const refName = capsuleRefMatch[1]
+                                                const ref = ambientReferences[refName]
+                                                if (ref && ref.type === 'capsule' && ref.value) {
+                                                    // ref.value is the capsuleSourceLineRef string
+                                                    propName = '#' + ref.value
+                                                } else if (encapsulateOptions.ambientReferences && encapsulateOptions.ambientReferences[refName]) {
+                                                    const runtimeRef = encapsulateOptions.ambientReferences[refName]
+                                                    if (runtimeRef && typeof runtimeRef === 'object' && runtimeRef.capsuleSourceLineRef) {
+                                                        propName = '#' + runtimeRef.capsuleSourceLineRef
+                                                    }
+                                                }
+                                            }
+                                        }
+
+                                        if (propName && ts.isPropertyAssignment(prop)) {
                                             const propValue = prop.initializer
 
                                             // Check if this is a property contract key (starts with '#')
@@ -475,8 +509,8 @@ export function StaticAnalyzer({
 
                                                 if (ts.isObjectLiteralExpression(propValue)) {
                                                     // Create property contract entry
-                                                    if (!spineContractDef.properties[propName]) {
-                                                        spineContractDef.properties[propName] = {
+                                                    if (!spineContractDef.propertyContracts[propName]) {
+                                                        spineContractDef.propertyContracts[propName] = {
                                                             propertyContractUri,
                                                             properties: {}
                                                         }
@@ -486,7 +520,7 @@ export function StaticAnalyzer({
                                                     for (const contractProp of propValue.properties) {
                                                         if (ts.isPropertyAssignment(contractProp) && ts.isIdentifier(contractProp.name) && contractProp.name.text === 'as') {
                                                             if (ts.isStringLiteral(contractProp.initializer)) {
-                                                                spineContractDef.properties[propName].as = contractProp.initializer.text
+                                                                spineContractDef.propertyContracts[propName].as = contractProp.initializer.text
                                                             }
                                                         }
                                                     }
@@ -527,6 +561,22 @@ export function StaticAnalyzer({
 
                                                                             // Store the value expression as text
                                                                             propDef.valueExpression = fieldValue.getText(sourceFile)
+
+                                                                            // For Mapping properties with string values, resolve to npm URI
+                                                                            if (propDef.type === 'CapsulePropertyTypes.Mapping' && ts.isStringLiteral(fieldValue)) {
+                                                                                const mappingValue = fieldValue.text
+                                                                                if (mappingValue.startsWith('./') || mappingValue.startsWith('../')) {
+                                                                                    // Resolve relative to the current module's directory
+                                                                                    const resolvedPath = resolve(dirname(moduleFilepath), mappingValue)
+                                                                                    const npmUri = await constructNpmUri(resolvedPath + '.ts', spineOptions.spineFilesystemRoot)
+                                                                                    if (npmUri) {
+                                                                                        propDef.mappedModuleUri = npmUri.replace(/\.(ts|tsx|js|jsx)$/, '')
+                                                                                    }
+                                                                                } else if (mappingValue.startsWith('@')) {
+                                                                                    // Already an npm URI
+                                                                                    propDef.mappedModuleUri = mappingValue
+                                                                                }
+                                                                            }
 
                                                                             // Extract ambient references if it's a function
                                                                             if (ts.isFunctionExpression(fieldValue) || ts.isArrowFunction(fieldValue)) {
@@ -572,7 +622,7 @@ export function StaticAnalyzer({
                                                                     }
                                                                 }
 
-                                                                spineContractDef.properties[propName].properties[contractPropName] = propDef
+                                                                spineContractDef.propertyContracts[propName].properties[contractPropName] = propDef
                                                             }
                                                         }
                                                     }
@@ -591,10 +641,10 @@ export function StaticAnalyzer({
                     // For each non-default property contract, create a mapping in the '#' contract
                     for (const [spineContractName, spineContractDef] of Object.entries(cst.spineContracts)) {
                         const spineContract = spineContractDef as any
-                        if (spineContract.properties) {
+                        if (spineContract.propertyContracts) {
                             // Find all non-default property contracts
                             const nonDefaultContracts: string[] = []
-                            for (const propName of Object.keys(spineContract.properties)) {
+                            for (const propName of Object.keys(spineContract.propertyContracts)) {
                                 if (propName.startsWith('#') && propName !== '#') {
                                     nonDefaultContracts.push(propName)
                                 }
@@ -603,28 +653,30 @@ export function StaticAnalyzer({
                             // Add dynamic mappings to the '#' contract
                             if (nonDefaultContracts.length > 0) {
                                 // Ensure '#' contract exists
-                                if (!spineContract.properties['#']) {
-                                    spineContract.properties['#'] = {
+                                if (!spineContract.propertyContracts['#']) {
+                                    spineContract.propertyContracts['#'] = {
                                         propertyContractUri: '',
                                         properties: {}
                                     }
                                 }
-                                if (!spineContract.properties['#'].properties) {
-                                    spineContract.properties['#'].properties = {}
+                                if (!spineContract.propertyContracts['#'].properties) {
+                                    spineContract.propertyContracts['#'].properties = {}
                                 }
 
                                 // Add a dynamic mapping for each non-default property contract
                                 for (const propContractUri of nonDefaultContracts) {
                                     // Check if 'as' alias is defined for this property contract
-                                    const aliasName = spineContract.properties[propContractUri]?.as
+                                    const aliasName = spineContract.propertyContracts[propContractUri]?.as
                                     const contractKey = aliasName || ('#' + propContractUri.substring(1))
-                                    spineContract.properties['#'].properties[contractKey] = {
+                                    const contractNpmUri = propContractUri.substring(1)
+                                    spineContract.propertyContracts['#'].properties[contractKey] = {
                                         declarationLine: -1,
                                         definitionStartLine: -1,
                                         definitionEndLine: -1,
                                         type: 'CapsulePropertyTypes.Mapping',
                                         valueType: 'string',
-                                        valueExpression: `"${propContractUri.substring(1)}"`,
+                                        valueExpression: `"${contractNpmUri}"`,
+                                        mappedModuleUri: contractNpmUri,
                                         propertyContractDelegate: propContractUri,
                                         as: aliasName
                                     }
@@ -1515,6 +1567,11 @@ function extractCapsuleAmbientReferences(
 
     // Second pass: find identifiers used as values (not property names)
     function visit(node: ts.Node) {
+        // Skip interface and type alias declarations — pure type constructs erased at runtime
+        if (ts.isInterfaceDeclaration(node) || ts.isTypeAliasDeclaration(node)) {
+            return
+        }
+
         // Check for identifiers that might be ambient references
         if (ts.isIdentifier(node)) {
             const identifierName = node.text
@@ -1821,6 +1878,11 @@ function extractAndValidateAmbientReferences(
     function visit(node: ts.Node) {
         // Skip type nodes to avoid false positives from type annotations
         if (ts.isTypeNode(node)) {
+            return
+        }
+
+        // Skip interface and type alias declarations — pure type constructs erased at runtime
+        if (ts.isInterfaceDeclaration(node) || ts.isTypeAliasDeclaration(node)) {
             return
         }
 

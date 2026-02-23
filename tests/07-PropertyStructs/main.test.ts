@@ -256,7 +256,7 @@ it('Property struct with "as" alias', async function () {
     })
 
     // Verify the CST contains the 'as' property on the property contract
-    const spineContractProps = capsuleWithAlias.cst.spineContracts['#@stream44.studio/encapsulate/spine-contracts/CapsuleSpineContract.v0'].properties
+    const spineContractProps = capsuleWithAlias.cst.spineContracts['#@stream44.studio/encapsulate/spine-contracts/CapsuleSpineContract.v0'].propertyContracts
     expect(spineContractProps['#@stream44.studio/encapsulate/structs/Capsule'].as).toBe('$capsuleInfo')
 
     // Verify the dynamic mapping in '#' uses the alias as the key

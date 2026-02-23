@@ -414,9 +414,9 @@ describe('Module-local function detection', () => {
         // Verify the mapping capsule CST has the path-based property
         const spineContract = (mappingCapsule as any).cst.spineContracts['#@stream44.studio/encapsulate/spine-contracts/CapsuleSpineContract.v0']
         expect(spineContract).toBeDefined()
-        expect(spineContract.properties['#']).toBeDefined()
-        expect(spineContract.properties['#'].properties['/apps/web/src/components/TestComponent.tsx']).toBeDefined()
-        expect(spineContract.properties['#'].properties['/apps/web/src/components/TestComponent.tsx'].type).toBe('CapsulePropertyTypes.Mapping')
+        expect(spineContract.propertyContracts['#']).toBeDefined()
+        expect(spineContract.propertyContracts['#'].properties['/apps/web/src/components/TestComponent.tsx']).toBeDefined()
+        expect(spineContract.propertyContracts['#'].properties['/apps/web/src/components/TestComponent.tsx'].type).toBe('CapsulePropertyTypes.Mapping')
     })
 
     it('should detect multiple path-based property names', async () => {
@@ -490,14 +490,14 @@ describe('Module-local function detection', () => {
 
         // Verify all path-based properties are detected
         const spineContract = (mappingCapsule as any).cst.spineContracts['#@stream44.studio/encapsulate/spine-contracts/CapsuleSpineContract.v0']
-        expect(spineContract.properties['#'].properties['/apps/web/src/components/Component1.tsx']).toBeDefined()
-        expect(spineContract.properties['#'].properties['/apps/web/src/components/Component2.tsx']).toBeDefined()
-        expect(spineContract.properties['#'].properties['/apps/mobile/src/screens/Screen1.tsx']).toBeDefined()
+        expect(spineContract.propertyContracts['#'].properties['/apps/web/src/components/Component1.tsx']).toBeDefined()
+        expect(spineContract.propertyContracts['#'].properties['/apps/web/src/components/Component2.tsx']).toBeDefined()
+        expect(spineContract.propertyContracts['#'].properties['/apps/mobile/src/screens/Screen1.tsx']).toBeDefined()
 
         // Verify they're all Mapping types
-        expect(spineContract.properties['#'].properties['/apps/web/src/components/Component1.tsx'].type).toBe('CapsulePropertyTypes.Mapping')
-        expect(spineContract.properties['#'].properties['/apps/web/src/components/Component2.tsx'].type).toBe('CapsulePropertyTypes.Mapping')
-        expect(spineContract.properties['#'].properties['/apps/mobile/src/screens/Screen1.tsx'].type).toBe('CapsulePropertyTypes.Mapping')
+        expect(spineContract.propertyContracts['#'].properties['/apps/web/src/components/Component1.tsx'].type).toBe('CapsulePropertyTypes.Mapping')
+        expect(spineContract.propertyContracts['#'].properties['/apps/web/src/components/Component2.tsx'].type).toBe('CapsulePropertyTypes.Mapping')
+        expect(spineContract.propertyContracts['#'].properties['/apps/mobile/src/screens/Screen1.tsx'].type).toBe('CapsulePropertyTypes.Mapping')
     })
 
     it('should handle path-based properties with string literal spine contract URI', async () => {
@@ -547,9 +547,9 @@ describe('Module-local function detection', () => {
         // Verify the spine contract was properly parsed with string literal
         const spineContract = (mappingCapsule as any).cst.spineContracts['#@stream44.studio/encapsulate/spine-contracts/CapsuleSpineContract.v0']
         expect(spineContract).toBeDefined()
-        expect(spineContract.properties['#@stream44.studio/encapsulate/structs/Capsule']).toBeDefined()
-        expect(spineContract.properties['#'].properties['/apps/web/src/components/Counter.tsx']).toBeDefined()
-        expect(spineContract.properties['#'].properties['/apps/web/src/components/Counter.tsx'].type).toBe('CapsulePropertyTypes.Mapping')
+        expect(spineContract.propertyContracts['#@stream44.studio/encapsulate/structs/Capsule']).toBeDefined()
+        expect(spineContract.propertyContracts['#'].properties['/apps/web/src/components/Counter.tsx']).toBeDefined()
+        expect(spineContract.propertyContracts['#'].properties['/apps/web/src/components/Counter.tsx'].type).toBe('CapsulePropertyTypes.Mapping')
     })
 
     it('should detect literal ambient references like prefix in capsule functions', async () => {
@@ -726,5 +726,42 @@ describe('Module-local function detection', () => {
         // Verify the CST was created (proves encapsulation succeeded)
         expect((capsule as any).cst).toBeDefined()
         expect((capsule as any).cst.source).toBeDefined()
+    })
+
+    it('should not treat interface declarations inside function bodies as ambient references', async () => {
+        const { encapsulate, CapsulePropertyTypes, makeImportStack } = await CapsuleSpineFactory({
+            spineFilesystemRoot: join(import.meta.dir, '../../../../..'),
+            spineContracts: {
+                '#@stream44.studio/encapsulate/spine-contracts/CapsuleSpineContract.v0': CapsuleSpineContract
+            }
+        })
+
+        const capsule = await encapsulate({
+            '#@stream44.studio/encapsulate/spine-contracts/CapsuleSpineContract.v0': {
+                '#@stream44.studio/encapsulate/structs/Capsule': {},
+                '#': {
+                    process: {
+                        type: CapsulePropertyTypes.Function,
+                        value: async function (this: any): Promise<void> {
+                            interface Entry { name: string; value: number }
+                            type Mapping = Record<string, Entry>
+                            const items: Entry[] = [{ name: 'a', value: 1 }]
+                            const map: Mapping = {}
+                            for (const item of items) {
+                                map[item.name] = item
+                            }
+                        }
+                    }
+                }
+            }
+        }, {
+            importMeta: import.meta,
+            importStack: makeImportStack(),
+            capsuleName: 'testCapsule'
+        })
+
+        // Interface and type alias declarations should NOT be treated as ambient references
+        expect((capsule as any).cst.source.ambientReferences).not.toHaveProperty('Entry')
+        expect((capsule as any).cst.source.ambientReferences).not.toHaveProperty('Mapping')
     })
 })

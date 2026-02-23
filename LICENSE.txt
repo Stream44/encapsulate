@@ -1,6 +1,6 @@
 MIT License
 
-Object encapsulation & mapping system with runtime kernel for TypeScript
+encapsulate: Object encapsulation & mapping system with runtime kernel for TypeScript
 
 Copyright 2026 Christoph Dorn - https://Christoph.diy
 
