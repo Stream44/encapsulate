@@ -28,8 +28,11 @@ function safeCapsuleName(name: string) {
  * @returns The cache file path to use
  */
 async function constructCacheFilePath(moduleFilepath: string, importStackLine: number, spineFilesystemRoot: string): Promise<string> {
-    if (moduleFilepath.startsWith('../')) {
-        // External module - construct npm URI
+    const isExternal = moduleFilepath.startsWith('../')
+    const hasNodeModules = moduleFilepath.includes('node_modules/')
+
+    if (isExternal || hasNodeModules) {
+        // External module or node_modules path - construct npm URI
         const absoluteFilepath = join(spineFilesystemRoot, moduleFilepath)
         const npmUri = await constructNpmUriForCache(absoluteFilepath, spineFilesystemRoot)
         if (npmUri) {

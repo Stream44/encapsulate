@@ -241,8 +241,11 @@ export function StaticAnalyzer({
 
             // Determine the cache file path based on whether the module is external or internal
             let cacheFilePath: string
-            if (encapsulateOptions.moduleFilepath.startsWith('../')) {
-                // External module - construct npm URI
+            const isExternal = encapsulateOptions.moduleFilepath.startsWith('../')
+            const hasNodeModules = encapsulateOptions.moduleFilepath.includes('node_modules/')
+
+            if (isExternal || hasNodeModules) {
+                // External module or node_modules path - construct npm URI
                 const npmUri = await constructNpmUri(moduleFilepath, spineOptions.spineFilesystemRoot)
                 if (npmUri) {
                     // Prefix with o/npmjs.com/node_modules/ for external modules
