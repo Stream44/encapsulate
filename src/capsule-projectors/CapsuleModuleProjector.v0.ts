@@ -33,7 +33,8 @@ async function constructCacheFilePath(moduleFilepath: string, importStackLine: n
         const absoluteFilepath = join(spineFilesystemRoot, moduleFilepath)
         const npmUri = await constructNpmUriForCache(absoluteFilepath, spineFilesystemRoot)
         if (npmUri) {
-            return `${npmUri}:${importStackLine}`
+            // Prefix with o/npmjs.com/node_modules/ for external modules
+            return `o/npmjs.com/node_modules/${npmUri}:${importStackLine}`
         }
         // Fallback to normalized path
         return `${normalize(moduleFilepath).replace(/^\.\.\//, '').replace(/\.\.\//g, '')}:${importStackLine}`
@@ -43,10 +44,20 @@ async function constructCacheFilePath(moduleFilepath: string, importStackLine: n
 }
 
 /**
- * Finds the nearest package.json and constructs an npm URI for cache files
+ * Finds the nearest package.json and constructs an npm URI for cache files.
+ * First checks if the path contains /node_modules/ and if so, extracts the portion
+ * after the last /node_modules/ occurrence for consistent paths in dev and installed mode.
  * This matches the logic from static-analyzer.v0.ts
  */
 async function constructNpmUriForCache(absoluteFilepath: string, spineRoot: string): Promise<string | null> {
+    // Check for /node_modules/ in the path — use the last occurrence to handle nested node_modules
+    const nodeModulesMarker = '/node_modules/'
+    const lastIdx = absoluteFilepath.lastIndexOf(nodeModulesMarker)
+    if (lastIdx !== -1) {
+        // Extract everything after the last /node_modules/
+        return absoluteFilepath.substring(lastIdx + nodeModulesMarker.length)
+    }
+
     let currentDir = dirname(absoluteFilepath)
     const maxDepth = 20 // Prevent infinite loops
 

@@ -14,12 +14,22 @@ const ENCAPSULATE_MODULE_EXPORTS = new Set([
 ])
 
 /**
- * Finds the nearest package.json and constructs an npm URI for the given filepath
+ * Finds the nearest package.json and constructs an npm URI for the given filepath.
+ * First checks if the path contains /node_modules/ and if so, extracts the portion
+ * after the last /node_modules/ occurrence for consistent paths in dev and installed mode.
  * @param absoluteFilepath - The absolute path to the file
  * @param spineRoot - The spine filesystem root
  * @returns The npm URI (e.g., '@scope/package/path/to/file.ts') or null if not found
  */
 async function constructNpmUri(absoluteFilepath: string, spineRoot: string): Promise<string | null> {
+    // Check for /node_modules/ in the path — use the last occurrence to handle nested node_modules
+    const nodeModulesMarker = '/node_modules/'
+    const lastIdx = absoluteFilepath.lastIndexOf(nodeModulesMarker)
+    if (lastIdx !== -1) {
+        // Extract everything after the last /node_modules/
+        return absoluteFilepath.substring(lastIdx + nodeModulesMarker.length)
+    }
+
     let currentDir = dirname(absoluteFilepath)
     const maxDepth = 20 // Prevent infinite loops
 
@@ -55,6 +65,13 @@ async function constructNpmUri(absoluteFilepath: string, spineRoot: string): Pro
     }
 
     return null
+}
+
+/**
+ * Checks if a filepath was resolved via node_modules
+ */
+function isFromNodeModules(absoluteFilepath: string): boolean {
+    return absoluteFilepath.includes('/node_modules/')
 }
 
 // Native JavaScript APIs that don't require explicit ambient reference declaration
@@ -228,7 +245,8 @@ export function StaticAnalyzer({
                 // External module - construct npm URI
                 const npmUri = await constructNpmUri(moduleFilepath, spineOptions.spineFilesystemRoot)
                 if (npmUri) {
-                    cacheFilePath = npmUri
+                    // Prefix with o/npmjs.com/node_modules/ for external modules
+                    cacheFilePath = `o/npmjs.com/node_modules/${npmUri}`
                 } else {
                     // Fallback to normalized path if npm URI construction fails
                     cacheFilePath = normalize(encapsulateOptions.moduleFilepath).replace(/^\.\.\//, '').replace(/\.\.\//g, '')
