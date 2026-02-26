@@ -61,7 +61,9 @@ export class ContractCapsuleInstanceFactory {
             overrides: overrides || {},
             options: options,
             runtimeSpineContracts: this.runtimeSpineContracts,
-            rootCapsule: this.capsuleInstance?.rootCapsule
+            rootCapsule: this.capsuleInstance?.rootCapsule,
+            parentCapsuleSourceUriLineRefInstanceId: this.capsuleInstance?.capsuleSourceUriLineRefInstanceId,
+            sit: this.capsuleInstance?.sit
         })
 
         // Run init functions on the imported capsule instance
@@ -310,7 +312,9 @@ export class ContractCapsuleInstanceFactory {
             overrides: mappedOverrides,
             options: ownMappingOptions,
             runtimeSpineContracts: this.runtimeSpineContracts,
-            rootCapsule: this.capsuleInstance?.rootCapsule
+            rootCapsule: this.capsuleInstance?.rootCapsule,
+            parentCapsuleSourceUriLineRefInstanceId: this.capsuleInstance?.capsuleSourceUriLineRefInstanceId,
+            sit: this.capsuleInstance?.sit
         })
 
         // Register the instance (replaces null pre-registration marker)

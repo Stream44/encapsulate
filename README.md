@@ -3,6 +3,7 @@
     <td><a href="https://Stream44.Studio"><img src=".o/stream44.studio/assets/Icon-v1.svg" width="42" height="42"></a></td>
     <td><strong><a href="https://Stream44.Studio">Stream44 Studio</a></strong><br/>Open Development Project</td>
     <td>Preview release for community feedback.<br/>Get in touch on <a href="https://discord.gg/9eBcQXEJAN">discord</a>.</td>
+    <td>Hand Designed<br/><b>AI Coded Alpha</a></td>
   </tr>
 </table>
 
@@ -43,7 +44,6 @@ The capsule spine contract is implemented here: [src/spine-contracts/CapsuleSpin
 - [ ] Load capsules from packs
 
 ![Capsule Spine Contract Overview](./src/spine-contracts/CapsuleSpineContract.v0/Overview.svg)
-
 
 Provenance
 ===

@@ -1,7 +1,7 @@
 
 // CACHE_BUST_VERSION: Increment this whenever CST cache must be invalidated due to structural changes
 // This ensures projected capsules are regenerated when the CST format changes
-const CACHE_BUST_VERSION = 18
+const CACHE_BUST_VERSION = 20
 
 type TSpineOptions = {
     spineFilesystemRoot?: string,
@@ -53,7 +53,9 @@ type TCapsuleMakeInstanceOptions = {
         capsuleName: string,
         capsuleSourceLineRef: string,
         moduleFilepath: string
-    }
+    },
+    parentCapsuleSourceUriLineRefInstanceId?: string,
+    sit?: { capsuleInstances: Record<string, { capsuleName: string, capsuleSourceUriLineRef: string, parentCapsuleSourceUriLineRefInstanceId: string }> }
 }
 
 type TCapsule = {
@@ -552,7 +554,7 @@ async function encapsulate(definition: TCapsuleDefinition, options: TCapsuleOpti
         encapsulateOptions,
         cst,
         crt: crts?.[capsuleSourceLineRef],
-        makeInstance: async ({ overrides = {}, options = {}, runtimeSpineContracts, sharedSelf, rootCapsule }: TCapsuleMakeInstanceOptions = {}) => {
+        makeInstance: async ({ overrides = {}, options = {}, runtimeSpineContracts, sharedSelf, rootCapsule, parentCapsuleSourceUriLineRefInstanceId, sit }: TCapsuleMakeInstanceOptions = {}) => {
 
             // Create cache key based on parameters
             // When sharedSelf is provided, we must NOT cache because each extending capsule
@@ -811,7 +813,11 @@ async function encapsulate(definition: TCapsuleDefinition, options: TCapsuleOpti
                             capsuleName: encapsulateOptions.capsuleName!,
                             capsuleSourceLineRef: absoluteCapsuleSourceLineRef,
                             moduleFilepath: absoluteModuleFilepath
-                        }
+                        },
+                        parentCapsuleSourceUriLineRefInstanceId: parentCapsuleSourceUriLineRefInstanceId
+                            ? sha256(parentCapsuleSourceUriLineRefInstanceId + ':' + (cst?.capsuleSourceUriLineRef || encapsulateOptions.capsuleSourceLineRef))
+                            : sha256(cst?.capsuleSourceUriLineRef || encapsulateOptions.capsuleSourceLineRef),
+                        sit
                     })
                 }
 
@@ -827,6 +833,23 @@ async function encapsulate(definition: TCapsuleDefinition, options: TCapsuleOpti
                 capsuleMetadataStruct.rootCapsule.capsuleSourceLineRef = resolvedRootCapsule.capsuleSourceLineRef
                 capsuleMetadataStruct.rootCapsule.moduleFilepath = resolvedRootCapsule.moduleFilepath
 
+                // Compute deterministic instance ID:
+                //   root:  sha256(capsuleSourceUriLineRef)
+                //   child: sha256(parentCapsuleSourceUriLineRefInstanceId + ":" + capsuleSourceUriLineRef)
+                const capsuleSourceUriLineRef = cst?.capsuleSourceUriLineRef || encapsulateOptions.capsuleSourceLineRef
+                const capsuleSourceUriLineRefInstanceId = parentCapsuleSourceUriLineRefInstanceId
+                    ? sha256(parentCapsuleSourceUriLineRefInstanceId + ':' + capsuleSourceUriLineRef)
+                    : sha256(capsuleSourceUriLineRef)
+
+                // Register this instance in the sit structure if provided
+                if (sit) {
+                    sit.capsuleInstances[capsuleSourceUriLineRefInstanceId] = {
+                        capsuleName: encapsulateOptions.capsuleName || '',
+                        capsuleSourceUriLineRef,
+                        parentCapsuleSourceUriLineRefInstanceId: parentCapsuleSourceUriLineRefInstanceId || ''
+                    }
+                }
+
                 const capsuleInstance: any = {
                     api: encapsulatedApi,
                     spineContractCapsuleInstances,
@@ -836,7 +859,11 @@ async function encapsulate(definition: TCapsuleDefinition, options: TCapsuleOpti
                     initFunctions: [] as Array<() => any>,
                     disposeFunctions: [] as Array<() => any>,
                     mappedCapsuleInstances: [] as Array<any>,
-                    rootCapsule: resolvedRootCapsule
+                    rootCapsule: resolvedRootCapsule,
+                    capsuleSourceUriLineRefInstanceId,
+                    capsuleName: encapsulateOptions.capsuleName,
+                    capsuleSourceUriLineRef,
+                    sit
                 }
 
                 // Set capsule metadata struct on self early so it's available in options() callbacks during mapping
@@ -1060,6 +1087,17 @@ function relative(from: string, to: string): string {
 
     const result = [...Array(upCount).fill('..'), ...remainingTo].join('/')
     return result || '.'
+}
+
+function sha256(input: string): string {
+    // Use Bun's native hasher for speed; falls back to Node crypto
+    if (typeof globalThis.Bun !== 'undefined') {
+        const hasher = new globalThis.Bun.CryptoHasher('sha256')
+        hasher.update(input)
+        return hasher.digest('hex') as string
+    }
+    const { createHash } = require('crypto')
+    return createHash('sha256').update(input).digest('hex')
 }
 
 function isObject(item: any): boolean {

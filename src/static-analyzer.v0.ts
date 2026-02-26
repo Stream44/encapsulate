@@ -366,7 +366,7 @@ export function StaticAnalyzer({
 
                     const capsuleSourceLineRef = `${encapsulateOptions.moduleFilepath}:${encapsulateOptions.importStackLine}`
                     const capsuleSourceNameRef = encapsulateOptions.capsuleName && `${encapsulateOptions.moduleFilepath}:${encapsulateOptions.capsuleName}`
-                    const capsuleSourceNameRefHash = capsuleSourceNameRef && createHash('md5').update(capsuleSourceNameRef).digest('hex')
+                    const capsuleSourceNameRefHash = capsuleSourceNameRef && createHash('sha256').update(capsuleSourceNameRef).digest('hex')
 
                     // Construct npm URI for the module - try for all modules
                     let moduleUri: string | null = await constructNpmUri(moduleFilepath, spineOptions.spineFilesystemRoot)

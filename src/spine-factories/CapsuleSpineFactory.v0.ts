@@ -570,13 +570,138 @@ export async function CapsuleSpineFactory({
         return capsule
     }
 
+    // Wrap freeze to also write spine instance (.sit.json) files
+    const wrappedFreeze = async function () {
+        const snapshot = await freeze()
+
+        // Write spine instance files if capsuleModuleProjectionRoot is available
+        if (capsuleModuleProjectionRoot) {
+            try {
+                // Deduplicate capsules: the capsules dict has entries keyed by both
+                // capsuleSourceLineRef and capsuleName — only process capsuleSourceLineRef keys
+                const uniqueCapsules: Record<string, any> = {}
+                for (const [key, capsule] of Object.entries(capsules)) {
+                    if (key.includes(':') && /:\d+$/.test(key)) {
+                        uniqueCapsules[key] = capsule
+                    }
+                }
+
+                // Find root capsules — capsules that are NOT referenced as mapped dependencies
+                const mappedCapsuleNames = new Set<string>()
+                for (const [, capsule] of Object.entries(uniqueCapsules)) {
+                    const cst = capsule.cst
+                    if (cst?.spineContracts) {
+                        for (const [, spineContract] of Object.entries(cst.spineContracts) as any) {
+                            if (spineContract.propertyContracts) {
+                                for (const [, propContract] of Object.entries(spineContract.propertyContracts) as any) {
+                                    if (propContract.properties) {
+                                        for (const [, propDef] of Object.entries(propContract.properties) as any) {
+                                            if (propDef.type === 'CapsulePropertyTypes.Mapping' && propDef.mappedModuleUri) {
+                                                mappedCapsuleNames.add(propDef.mappedModuleUri)
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    if (cst?.source?.extendsCapsuleUri) {
+                        mappedCapsuleNames.add(cst.source.extendsCapsuleUri)
+                    }
+                }
+
+                for (const [, capsule] of Object.entries(uniqueCapsules)) {
+                    const cst = capsule.cst
+                    const rootCapsuleName = cst?.source?.capsuleName
+                    if (!rootCapsuleName) continue
+
+                    const moduleUri = cst?.source?.moduleUri
+                    if (mappedCapsuleNames.has(rootCapsuleName) || (moduleUri && mappedCapsuleNames.has(moduleUri))) {
+                        continue
+                    }
+
+                    // This is a root capsule — write its .sit.json
+                    const dirName = rootCapsuleName.replace(/\//g, '~')
+                    const sitDir = join(capsuleModuleProjectionRoot, '.~o/encapsulate.dev/spine-instances', dirName)
+                    const sitFilePath = join(sitDir, `root-capsule.sit.json`)
+
+                    // Build the capsules map
+                    const capsuleEntries: Record<string, { capsuleSourceUriLineRef: string }> = {}
+                    for (const [, cap] of Object.entries(uniqueCapsules)) {
+                        const capCst = cap.cst
+                        if (capCst?.source?.capsuleName) {
+                            capsuleEntries[capCst.source.capsuleName] = {
+                                capsuleSourceUriLineRef: capCst.capsuleSourceUriLineRef
+                            }
+                        }
+                    }
+
+                    // Collect capsuleInstances from the cached root instance using an
+                    // iterative stack — each instance stores its ID and parent ID from init
+                    const rootInstance = await capsule.makeInstance()
+                    const capsuleInstances: Record<string, { capsuleName: string, capsuleSourceUriLineRef: string, parentCapsuleSourceUriLineRefInstanceId: string }> = {}
+
+                    // If the root instance has a sit with pre-populated capsuleInstances, use it directly
+                    if (rootInstance.sit?.capsuleInstances && Object.keys(rootInstance.sit.capsuleInstances).length > 0) {
+                        Object.assign(capsuleInstances, rootInstance.sit.capsuleInstances)
+                    } else {
+                        // Iterative stack-based collection from instance tree
+                        const stack: Array<{ instance: any, parentId: string }> = [{ instance: rootInstance, parentId: '' }]
+                        const visited = new Set<string>()
+                        while (stack.length > 0) {
+                            const { instance, parentId } = stack.pop()!
+                            if (!instance?.capsuleSourceUriLineRefInstanceId) continue
+                            const id = instance.capsuleSourceUriLineRefInstanceId
+                            if (visited.has(id)) continue
+                            visited.add(id)
+
+                            capsuleInstances[id] = {
+                                capsuleName: instance.capsuleName || '',
+                                capsuleSourceUriLineRef: instance.capsuleSourceUriLineRef || '',
+                                parentCapsuleSourceUriLineRefInstanceId: parentId
+                            }
+
+                            if (instance.extendedCapsuleInstance) {
+                                stack.push({ instance: instance.extendedCapsuleInstance, parentId: id })
+                            }
+                            if (instance.mappedCapsuleInstances) {
+                                for (const mapped of instance.mappedCapsuleInstances) {
+                                    stack.push({ instance: mapped, parentId: id })
+                                }
+                            }
+                        }
+                    }
+
+                    const rootInstanceId = rootInstance.capsuleSourceUriLineRefInstanceId || ''
+
+                    const sitData = {
+                        rootCapsule: {
+                            capsuleSourceUriLineRef: cst.capsuleSourceUriLineRef,
+                            capsuleSourceUriLineRefInstanceId: rootInstanceId
+                        },
+                        capsules: capsuleEntries,
+                        capsuleInstances
+                    }
+
+                    await mkdir(sitDir, { recursive: true })
+                    await writeFile(sitFilePath, JSON.stringify(sitData, null, 2), 'utf-8')
+                }
+            } catch (error) {
+                // Spine instance file writing is best-effort
+                console.warn('Warning: Failed to write spine instance files:', error)
+            }
+        }
+
+        return snapshot
+    }
+
     return {
         commonSpineContractOpts,
         CapsulePropertyTypes,
         makeImportStack,
         encapsulate,
         run,
-        freeze,
+        freeze: wrappedFreeze,
         loadCapsule,
         spineContractInstances, // Expose for testing
         hoistSnapshot: async ({ snapshot }: { snapshot: any }) => {

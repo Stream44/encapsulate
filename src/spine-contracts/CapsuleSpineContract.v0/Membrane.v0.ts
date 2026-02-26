@@ -6,6 +6,7 @@ type CallerContext = {
     capsuleSourceNameRef?: string
     spineContractCapsuleInstanceId: string
     capsuleSourceNameRefHash?: string
+    capsuleSourceUriLineRefInstanceId?: string
     prop?: string
     filepath?: string
     line?: number
@@ -53,7 +54,8 @@ function CapsuleMembrane(target: Record<string, any>, hooks?: {
 class MembraneContractCapsuleInstanceFactory extends ContractCapsuleInstanceFactory {
     private getEventIndex: () => number
     private incrementEventIndex: () => number
-    private currentCallerContext: CallerContext | undefined
+    private getCurrentCallerContext: () => CallerContext | undefined
+    private setCurrentCallerContext: (ctx: CallerContext | undefined) => void
     private onMembraneEvent?: (event: any) => void
     private enableCallerStackInference: boolean
     private encapsulateOptions: any
@@ -77,7 +79,8 @@ class MembraneContractCapsuleInstanceFactory extends ContractCapsuleInstanceFact
         encapsulateOptions,
         getEventIndex,
         incrementEventIndex,
-        currentCallerContext,
+        getCurrentCallerContext,
+        setCurrentCallerContext,
         runtimeSpineContracts,
         instanceRegistry,
         extendedCapsuleInstance,
@@ -97,7 +100,8 @@ class MembraneContractCapsuleInstanceFactory extends ContractCapsuleInstanceFact
         encapsulateOptions: any
         getEventIndex: () => number
         incrementEventIndex: () => number
-        currentCallerContext?: CallerContext
+        getCurrentCallerContext: () => CallerContext | undefined
+        setCurrentCallerContext: (ctx: CallerContext | undefined) => void
         runtimeSpineContracts?: Record<string, any>
         instanceRegistry?: CapsuleInstanceRegistry
         extendedCapsuleInstance?: any
@@ -106,7 +110,8 @@ class MembraneContractCapsuleInstanceFactory extends ContractCapsuleInstanceFact
         super({ spineContractUri, capsule, self, ownSelf, encapsulatedApi, resolve, importCapsule, spineFilesystemRoot, freezeCapsule, instanceRegistry, extendedCapsuleInstance, capsuleInstance })
         this.getEventIndex = getEventIndex
         this.incrementEventIndex = incrementEventIndex
-        this.currentCallerContext = currentCallerContext
+        this.getCurrentCallerContext = getCurrentCallerContext
+        this.setCurrentCallerContext = setCurrentCallerContext
         this.onMembraneEvent = onMembraneEvent
         this.enableCallerStackInference = enableCallerStackInference
         this.encapsulateOptions = encapsulateOptions
@@ -116,8 +121,16 @@ class MembraneContractCapsuleInstanceFactory extends ContractCapsuleInstanceFact
         this.id = `$${encapsulateOptions.capsuleSourceLineRef}`
     }
 
-    setCurrentCallerContext(context: CallerContext | undefined): void {
-        this.currentCallerContext = context
+    private buildCallerContext(prop?: string): CallerContext {
+        const ctx: CallerContext = {
+            capsuleSourceLineRef: this.encapsulateOptions.capsuleSourceLineRef,
+            spineContractCapsuleInstanceId: this.id,
+        }
+        if (prop) ctx.prop = prop
+        if (this.capsuleSourceNameRef) ctx.capsuleSourceNameRef = this.capsuleSourceNameRef
+        if (this.capsuleSourceNameRefHash) ctx.capsuleSourceNameRefHash = this.capsuleSourceNameRefHash
+        if (this.capsuleInstance?.capsuleSourceUriLineRefInstanceId) ctx.capsuleSourceUriLineRefInstanceId = this.capsuleInstance.capsuleSourceUriLineRefInstanceId
+        return ctx
     }
 
     protected async mapMappingProperty({ overrides, options, property }: { overrides: any, options: any, property: any }) {
@@ -155,25 +168,23 @@ class MembraneContractCapsuleInstanceFactory extends ContractCapsuleInstanceFact
                                 throw new Error(`Capsule instance not yet resolved: ${capsuleName}`)
                             }
 
-                            this.currentCallerContext = {
-                                capsuleSourceLineRef: this.encapsulateOptions.capsuleSourceLineRef,
-                                capsuleSourceNameRef: this.capsuleSourceNameRef,
-                                spineContractCapsuleInstanceId: this.id,
-                                capsuleSourceNameRefHash: this.capsuleSourceNameRefHash,
-                                prop: apiProp as string
-                            }
+                            // Only update caller context if not already set by a function/getter execution
+                            if (!this.getCurrentCallerContext()) {
+                                const callerCtx = this.buildCallerContext(undefined)
 
-                            if (this.enableCallerStackInference) {
-                                const stackStr = new Error('[MAPPED_CAPSULE]').stack
-                                if (stackStr) {
-                                    const stackFrames = parseCallerFromStack(stackStr, this.spineFilesystemRoot)
-                                    if (stackFrames.length > 0) {
-                                        const callerInfo = extractCallerInfo(stackFrames, 3)
-                                        this.currentCallerContext.filepath = callerInfo.filepath
-                                        this.currentCallerContext.line = callerInfo.line
-                                        this.currentCallerContext.stack = stackFrames
+                                if (this.enableCallerStackInference) {
+                                    const stackStr = new Error('[MAPPED_CAPSULE]').stack
+                                    if (stackStr) {
+                                        const stackFrames = parseCallerFromStack(stackStr, this.spineFilesystemRoot)
+                                        if (stackFrames.length > 0) {
+                                            const callerInfo = extractCallerInfo(stackFrames, 3)
+                                            callerCtx.filepath = callerInfo.filepath
+                                            callerCtx.line = callerInfo.line
+                                            callerCtx.stack = stackFrames
+                                        }
                                     }
                                 }
+                                this.setCurrentCallerContext(callerCtx)
                             }
 
                             // Access through .api if it exists (for capsule instances with getters)
@@ -280,25 +291,23 @@ class MembraneContractCapsuleInstanceFactory extends ContractCapsuleInstanceFact
             get: (apiTarget: any, apiProp: string | symbol) => {
                 if (typeof apiProp === 'symbol') return apiTarget[apiProp]
 
-                this.currentCallerContext = {
-                    capsuleSourceLineRef: this.encapsulateOptions.capsuleSourceLineRef,
-                    capsuleSourceNameRef: this.capsuleSourceNameRef,
-                    spineContractCapsuleInstanceId: this.id,
-                    capsuleSourceNameRefHash: this.capsuleSourceNameRefHash,
-                    prop: apiProp as string
-                }
+                // Only update caller context if not already set by a function/getter execution
+                if (!this.getCurrentCallerContext()) {
+                    const callerCtx = this.buildCallerContext(undefined)
 
-                if (this.enableCallerStackInference) {
-                    const stackStr = new Error('[MAPPED_CAPSULE]').stack
-                    if (stackStr) {
-                        const stackFrames = parseCallerFromStack(stackStr, this.spineFilesystemRoot)
-                        if (stackFrames.length > 0) {
-                            const callerInfo = extractCallerInfo(stackFrames, 3)
-                            this.currentCallerContext.filepath = callerInfo.filepath
-                            this.currentCallerContext.line = callerInfo.line
-                            this.currentCallerContext.stack = stackFrames
+                    if (this.enableCallerStackInference) {
+                        const stackStr = new Error('[MAPPED_CAPSULE]').stack
+                        if (stackStr) {
+                            const stackFrames = parseCallerFromStack(stackStr, this.spineFilesystemRoot)
+                            if (stackFrames.length > 0) {
+                                const callerInfo = extractCallerInfo(stackFrames, 3)
+                                callerCtx.filepath = callerInfo.filepath
+                                callerCtx.line = callerInfo.line
+                                callerCtx.stack = stackFrames
+                            }
                         }
                     }
+                    this.setCurrentCallerContext(callerCtx)
                 }
 
                 // Access through .api if it exists (for capsule instances with getters)
@@ -345,25 +354,23 @@ class MembraneContractCapsuleInstanceFactory extends ContractCapsuleInstanceFact
                     // Wrap the property access in a proxy to track membrane events
                     Object.defineProperty(delegateTarget, key, {
                         get: () => {
-                            this.currentCallerContext = {
-                                capsuleSourceLineRef: this.encapsulateOptions.capsuleSourceLineRef,
-                                capsuleSourceNameRef: this.capsuleSourceNameRef,
-                                spineContractCapsuleInstanceId: this.id,
-                                capsuleSourceNameRefHash: this.capsuleSourceNameRefHash,
-                                prop: key
-                            }
+                            // Only update caller context if not already set by a function/getter execution
+                            if (!this.getCurrentCallerContext()) {
+                                const callerCtx = this.buildCallerContext(undefined)
 
-                            if (this.enableCallerStackInference) {
-                                const stackStr = new Error('[PROPERTY_CONTRACT_DELEGATE]').stack
-                                if (stackStr) {
-                                    const stackFrames = parseCallerFromStack(stackStr, this.spineFilesystemRoot)
-                                    if (stackFrames.length > 0) {
-                                        const callerInfo = extractCallerInfo(stackFrames, 3)
-                                        this.currentCallerContext.filepath = callerInfo.filepath
-                                        this.currentCallerContext.line = callerInfo.line
-                                        this.currentCallerContext.stack = stackFrames
+                                if (this.enableCallerStackInference) {
+                                    const stackStr = new Error('[PROPERTY_CONTRACT_DELEGATE]').stack
+                                    if (stackStr) {
+                                        const stackFrames = parseCallerFromStack(stackStr, this.spineFilesystemRoot)
+                                        if (stackFrames.length > 0) {
+                                            const callerInfo = extractCallerInfo(stackFrames, 3)
+                                            callerCtx.filepath = callerInfo.filepath
+                                            callerCtx.line = callerInfo.line
+                                            callerCtx.stack = stackFrames
+                                        }
                                     }
                                 }
+                                this.setCurrentCallerContext(callerCtx)
                             }
 
                             // Access the actual value from the instance's api
@@ -513,6 +520,9 @@ class MembraneContractCapsuleInstanceFactory extends ContractCapsuleInstanceFact
                         if (this.capsuleSourceNameRefHash) {
                             callEvent.target.capsuleSourceNameRefHash = this.capsuleSourceNameRefHash
                         }
+                        if (this.capsuleInstance?.capsuleSourceUriLineRefInstanceId) {
+                            callEvent.target.capsuleSourceUriLineRefInstanceId = this.capsuleInstance.capsuleSourceUriLineRefInstanceId
+                        }
 
                         this.addCallerContextToEvent(callEvent)
                         this.onMembraneEvent?.(callEvent)
@@ -550,11 +560,18 @@ class MembraneContractCapsuleInstanceFactory extends ContractCapsuleInstanceFact
                     if (this.capsuleSourceNameRefHash) {
                         callEvent.target.capsuleSourceNameRefHash = this.capsuleSourceNameRefHash
                     }
+                    if (this.capsuleInstance?.capsuleSourceUriLineRefInstanceId) {
+                        callEvent.target.capsuleSourceUriLineRefInstanceId = this.capsuleInstance.capsuleSourceUriLineRefInstanceId
+                    }
 
                     this.addCallerContextToEvent(callEvent)
                     this.onMembraneEvent?.(callEvent)
 
+                    // Set this capsule as caller for any inner membrane events triggered by the function body
+                    const previousCallerContext = this.getCurrentCallerContext()
+                    this.setCurrentCallerContext(this.buildCallerContext(property.name))
                     const result = boundFunction(...args)
+                    this.setCurrentCallerContext(previousCallerContext)
 
                     // Store in memoize cache if memoize is enabled
                     if (shouldMemoize) {
@@ -635,8 +652,11 @@ class MembraneContractCapsuleInstanceFactory extends ContractCapsuleInstanceFact
                     return cachedResult
                 }
 
-                // Call the getter function lazily when accessed with proper this context
+                // Set this capsule as caller for any inner membrane events triggered by the getter body
+                const previousCallerContext = this.getCurrentCallerContext()
+                this.setCurrentCallerContext(this.buildCallerContext(property.name))
                 const result = getterFn.call(selfProxy)
+                this.setCurrentCallerContext(previousCallerContext)
 
                 // Store in memoize cache if memoize is enabled
                 if (shouldMemoize) {
@@ -693,28 +713,32 @@ class MembraneContractCapsuleInstanceFactory extends ContractCapsuleInstanceFact
     }
 
     private addCallerContextToEvent(event: any): void {
-        if (this.currentCallerContext) {
+        const callerCtx = this.getCurrentCallerContext()
+        if (callerCtx) {
             event.caller = {
-                capsuleSourceLineRef: this.currentCallerContext.capsuleSourceLineRef,
-                spineContractCapsuleInstanceId: this.currentCallerContext.spineContractCapsuleInstanceId,
+                capsuleSourceLineRef: callerCtx.capsuleSourceLineRef,
+                spineContractCapsuleInstanceId: callerCtx.spineContractCapsuleInstanceId,
             }
-            if (this.currentCallerContext.capsuleSourceNameRef) {
-                event.caller.capsuleSourceNameRef = this.currentCallerContext.capsuleSourceNameRef
+            if (callerCtx.capsuleSourceNameRef) {
+                event.caller.capsuleSourceNameRef = callerCtx.capsuleSourceNameRef
             }
-            if (this.currentCallerContext.capsuleSourceNameRefHash) {
-                event.caller.capsuleSourceNameRefHash = this.currentCallerContext.capsuleSourceNameRefHash
+            if (callerCtx.capsuleSourceNameRefHash) {
+                event.caller.capsuleSourceNameRefHash = callerCtx.capsuleSourceNameRefHash
             }
-            if (this.currentCallerContext.prop) {
-                event.caller.prop = this.currentCallerContext.prop
+            if (callerCtx.capsuleSourceUriLineRefInstanceId) {
+                event.caller.capsuleSourceUriLineRefInstanceId = callerCtx.capsuleSourceUriLineRefInstanceId
             }
-            if (this.currentCallerContext.filepath) {
-                event.caller.filepath = this.currentCallerContext.filepath
+            if (callerCtx.prop) {
+                event.caller.prop = callerCtx.prop
             }
-            if (this.currentCallerContext.line) {
-                event.caller.line = this.currentCallerContext.line
+            if (callerCtx.filepath) {
+                event.caller.filepath = callerCtx.filepath
             }
-            if (this.currentCallerContext.stack) {
-                event.caller.stack = this.currentCallerContext.stack
+            if (callerCtx.line) {
+                event.caller.line = callerCtx.line
+            }
+            if (callerCtx.stack) {
+                event.caller.stack = callerCtx.stack
             }
         } else if (this.enableCallerStackInference) {
             const stackStr = new Error('[MEMBRANE_EVENT]').stack
@@ -771,7 +795,8 @@ export function CapsuleSpineContract({
                 encapsulateOptions,
                 getEventIndex: () => eventIndex,
                 incrementEventIndex: () => eventIndex++,
-                currentCallerContext,
+                getCurrentCallerContext: () => currentCallerContext,
+                setCurrentCallerContext: (ctx: CallerContext | undefined) => { currentCallerContext = ctx },
                 runtimeSpineContracts,
                 instanceRegistry,
                 extendedCapsuleInstance,
