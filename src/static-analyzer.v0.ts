@@ -528,20 +528,39 @@ export function StaticAnalyzer({
                                             if (propName.startsWith('#')) {
                                                 const propertyContractUri = propName.substring(1) // Remove the '#' prefix
 
+                                                // Resolve relative property contract URIs to full npm URIs
+                                                let resolvedPropertyContractUri = propertyContractUri
+                                                let resolvedPropName = propName
+                                                if (propertyContractUri.startsWith('./') || propertyContractUri.startsWith('../')) {
+                                                    const resolvedPath = resolve(dirname(moduleFilepath), propertyContractUri)
+                                                    const npmUri = await constructNpmUri(resolvedPath + '.ts', spineOptions.spineFilesystemRoot)
+                                                    if (npmUri) {
+                                                        resolvedPropertyContractUri = npmUri.replace(/\.(ts|tsx|js|jsx)$/, '')
+                                                        resolvedPropName = '#' + resolvedPropertyContractUri
+                                                    }
+                                                }
+
                                                 if (ts.isObjectLiteralExpression(propValue)) {
                                                     // Create property contract entry
-                                                    if (!spineContractDef.propertyContracts[propName]) {
-                                                        spineContractDef.propertyContracts[propName] = {
-                                                            propertyContractUri,
+                                                    if (!spineContractDef.propertyContracts[resolvedPropName]) {
+                                                        spineContractDef.propertyContracts[resolvedPropName] = {
+                                                            propertyContractUri: resolvedPropertyContractUri,
                                                             properties: {}
                                                         }
                                                     }
 
-                                                    // Check for 'as' property at the property contract level
+                                                    // Check for 'as' and 'options' properties at the property contract level
                                                     for (const contractProp of propValue.properties) {
-                                                        if (ts.isPropertyAssignment(contractProp) && ts.isIdentifier(contractProp.name) && contractProp.name.text === 'as') {
-                                                            if (ts.isStringLiteral(contractProp.initializer)) {
-                                                                spineContractDef.propertyContracts[propName].as = contractProp.initializer.text
+                                                        if (ts.isPropertyAssignment(contractProp) && ts.isIdentifier(contractProp.name)) {
+                                                            if (contractProp.name.text === 'as') {
+                                                                if (ts.isStringLiteral(contractProp.initializer)) {
+                                                                    spineContractDef.propertyContracts[resolvedPropName].as = contractProp.initializer.text
+                                                                }
+                                                            } else if (contractProp.name.text === 'options') {
+                                                                // Store literal options object on the property contract for graph queries
+                                                                if (ts.isObjectLiteralExpression(contractProp.initializer)) {
+                                                                    spineContractDef.propertyContracts[resolvedPropName].options = await extractLiteralObject(contractProp.initializer, sourceFile, moduleFilepath, spineOptions.spineFilesystemRoot)
+                                                                }
                                                             }
                                                         }
                                                     }
@@ -632,6 +651,9 @@ export function StaticAnalyzer({
                                                                                 if (selfRefs.size > 0) {
                                                                                     propDef.depends = Array.from(selfRefs)
                                                                                 }
+                                                                            } else if (ts.isObjectLiteralExpression(fieldValue)) {
+                                                                                // Store literal options object in the CST for graph queries
+                                                                                propDef.options = await extractLiteralObject(fieldValue, sourceFile, moduleFilepath, spineOptions.spineFilesystemRoot)
                                                                             }
                                                                         } else if (fieldName === 'kind') {
                                                                             propDef.kind = fieldValue.getText(sourceFile)
@@ -643,7 +665,7 @@ export function StaticAnalyzer({
                                                                     }
                                                                 }
 
-                                                                spineContractDef.propertyContracts[propName].properties[contractPropName] = propDef
+                                                                spineContractDef.propertyContracts[resolvedPropName].properties[contractPropName] = propDef
                                                             }
                                                         }
                                                     }
@@ -2186,6 +2208,75 @@ function extractAndValidateAmbientReferences(
     }
 
     return ambientRefs
+}
+
+// Extract a literal object from a TypeScript AST ObjectLiteralExpression.
+// Recursively walks the object tree and extracts string, number, boolean,
+// null values, arrays, and nested objects. String values that look like
+// relative paths (starting with ./ or ../) are resolved to npm URIs.
+async function extractLiteralObject(
+    node: ts.ObjectLiteralExpression,
+    sourceFile: ts.SourceFile,
+    moduleFilepath: string,
+    spineFilesystemRoot: string
+): Promise<Record<string, any>> {
+    const result: Record<string, any> = {}
+
+    for (const prop of node.properties) {
+        if (!ts.isPropertyAssignment(prop)) continue
+        let key: string | null = null
+        if (ts.isIdentifier(prop.name)) key = prop.name.text
+        else if (ts.isStringLiteral(prop.name)) key = prop.name.text
+        if (!key) continue
+
+        result[key] = await extractLiteralValue(prop.initializer, sourceFile, moduleFilepath, spineFilesystemRoot)
+    }
+
+    return result
+}
+
+// Extract a single literal value from a TS AST node.
+// Handles strings (with relative path resolution), numbers, booleans,
+// null, undefined, arrays, and nested objects.
+async function extractLiteralValue(
+    node: ts.Expression,
+    sourceFile: ts.SourceFile,
+    moduleFilepath: string,
+    spineFilesystemRoot: string
+): Promise<any> {
+    // String literals — resolve relative paths to npm URIs
+    if (ts.isStringLiteral(node)) {
+        const text = node.text
+        if (text.startsWith('./') || text.startsWith('../')) {
+            const resolvedPath = resolve(dirname(moduleFilepath), text)
+            const npmUri = await constructNpmUri(resolvedPath + '.ts', spineFilesystemRoot)
+            if (npmUri) return npmUri.replace(/\.(ts|tsx|js|jsx)$/, '')
+        }
+        return text
+    }
+    // Numeric literals
+    if (ts.isNumericLiteral(node)) return Number(node.text)
+    // Boolean literals
+    if (node.kind === ts.SyntaxKind.TrueKeyword) return true
+    if (node.kind === ts.SyntaxKind.FalseKeyword) return false
+    // Null
+    if (node.kind === ts.SyntaxKind.NullKeyword) return null
+    // Undefined
+    if (node.kind === ts.SyntaxKind.UndefinedKeyword) return undefined
+    // Nested objects
+    if (ts.isObjectLiteralExpression(node)) {
+        return await extractLiteralObject(node, sourceFile, moduleFilepath, spineFilesystemRoot)
+    }
+    // Arrays
+    if (ts.isArrayLiteralExpression(node)) {
+        const arr: any[] = []
+        for (const elem of node.elements) {
+            arr.push(await extractLiteralValue(elem, sourceFile, moduleFilepath, spineFilesystemRoot))
+        }
+        return arr
+    }
+    // Fallback: store the raw expression text
+    return node.getText(sourceFile)
 }
 
 // Check if a value is a literal type

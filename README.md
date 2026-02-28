@@ -17,6 +17,7 @@ An *experimental* implementation of the [PrivateData.Space](https://privatedata.
 ***NOTE:** Not intended for direct use until it matures in light of the projects below.*
 
 It is being used to underpin:
+- [Framespace Genesis](https://github.com/Stream44/FramespaceGenesis) - Modeling engine with realtime interactive visualization
 - [t44](https://github.com/Stream44/t44) - A web3 + AI ready workspace
 - [Stream44.Studio](https://stream44.studio) - A **full-stack IDE** for building **embodied distributed systems**
 

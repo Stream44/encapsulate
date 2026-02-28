@@ -14,6 +14,10 @@ export async function capsule({
                 structBOnly: {
                     type: CapsulePropertyTypes.Literal,
                     value: 'only-in-B'
+                },
+                testOption: {
+                    type: CapsulePropertyTypes.Literal,
+                    value: undefined
                 }
             }
         }

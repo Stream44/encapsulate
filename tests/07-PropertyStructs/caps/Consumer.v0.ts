@@ -11,7 +11,12 @@ export async function capsule({
                 as: '$configA'
             },
             '#../structs/StructB.v0': {
-                as: '$configB'
+                as: '$configB',
+                options: {
+                    '#': {
+                        testOption: 'testValue'
+                    }
+                }
             },
             '#': {
                 getConfigA: {

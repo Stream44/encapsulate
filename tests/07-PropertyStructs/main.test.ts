@@ -331,7 +331,8 @@ it('Multiple structs extending same parent capsule get separate instances', asyn
             structAOnly: api.consumer.$configA.structAOnly,
             structBOnly: api.consumer.$configB.structBOnly,
             sharedValueA: api.consumer.$configA.sharedValue,
-            sharedValueB: api.consumer.$configB.sharedValue
+            sharedValueB: api.consumer.$configB.sharedValue,
+            structBTestOption: api.consumer.$configB.testOption
         }
     })
 
@@ -353,6 +354,9 @@ it('Multiple structs extending same parent capsule get separate instances', asyn
     // Both should inherit sharedValue from parent
     expect(result.sharedValueA).toBe('shared-from-parent')
     expect(result.sharedValueB).toBe('shared-from-parent')
+
+    // Verify options are passed to StructB and set the testOption property
+    expect(result.structBTestOption).toBe('testValue')
 })
 
 
