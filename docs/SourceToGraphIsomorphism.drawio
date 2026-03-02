@@ -1,0 +1,100 @@
+<mxfile host="65bd71144e">
+    <diagram name="Page-1" id="QeIE7gKKPfThrfCM8ygm">
+        <mxGraphModel dx="1145" dy="1728" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1100" pageHeight="850" math="0" shadow="0">
+            <root>
+                <mxCell id="0"/>
+                <mxCell id="1" parent="0"/>
+                <mxCell id="N3hJ6-WijfH2HfO5JL5S-29" value="" style="rounded=0;whiteSpace=wrap;html=1;movable=1;resizable=1;rotatable=1;deletable=1;editable=1;locked=0;connectable=1;" parent="1" vertex="1">
+                    <mxGeometry x="10" y="-840" width="1070" height="480" as="geometry"/>
+                </mxCell>
+                <mxCell id="N3hJ6-WijfH2HfO5JL5S-33" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0;entryY=0.5;entryDx=0;entryDy=0;startArrow=classic;startFill=1;strokeWidth=2;" parent="1" source="N3hJ6-WijfH2HfO5JL5S-28" target="N3hJ6-WijfH2HfO5JL5S-25" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="N3hJ6-WijfH2HfO5JL5S-28" value="Source Code Module" style="rounded=0;whiteSpace=wrap;html=1;verticalAlign=top;dashed=1;" parent="1" vertex="1">
+                    <mxGeometry x="30" y="-800" width="570" height="420" as="geometry"/>
+                </mxCell>
+                <mxCell id="N3hJ6-WijfH2HfO5JL5S-25" value="Semantic Graph Module" style="rounded=0;whiteSpace=wrap;html=1;dashed=1;verticalAlign=top;" parent="1" vertex="1">
+                    <mxGeometry x="660" y="-800" width="390" height="420" as="geometry"/>
+                </mxCell>
+                <mxCell id="o5PIcx3FIGXJDux8oxUI-1" value="const &lt;font style=&quot;color: rgb(0, 102, 204);&quot;&gt;capsule&lt;/font&gt; = await Capsule({&lt;div&gt;&amp;nbsp; '&lt;font style=&quot;color: rgb(204, 102, 0);&quot;&gt;#@&amp;lt;org&amp;gt;/&amp;lt;project&amp;gt;/structs/StructA&lt;/font&gt;': {&lt;/div&gt;&lt;div&gt;&amp;nbsp; &amp;nbsp; as:&amp;nbsp;&lt;span style=&quot;background-color: transparent; color: light-dark(rgb(0, 0, 0), rgb(255, 255, 255));&quot;&gt;'&lt;/span&gt;&lt;font style=&quot;color: rgb(153, 51, 255);&quot;&gt;&lt;span style=&quot;background-color: transparent;&quot;&gt;$#&lt;/span&gt;&lt;span style=&quot;background-color: transparent;&quot;&gt;@&amp;lt;org&amp;gt;/&amp;lt;project&amp;gt;/AspectX&lt;/span&gt;&lt;/font&gt;&lt;span style=&quot;background-color: transparent; color: light-dark(rgb(0, 0, 0), rgb(255, 255, 255));&quot;&gt;'&lt;/span&gt;&lt;/div&gt;&lt;div&gt;&amp;nbsp; }&lt;/div&gt;&lt;div&gt;&amp;nbsp; '#'{&amp;nbsp;&lt;/div&gt;&lt;div&gt;&amp;nbsp; &amp;nbsp; &lt;font style=&quot;color: rgb(0, 153, 0);&quot;&gt;property1&lt;/font&gt;: 'val1',&lt;/div&gt;&lt;div&gt;&amp;nbsp; &amp;nbsp; &lt;font style=&quot;color: rgb(204, 0, 102);&quot;&gt;mapping1&lt;/font&gt;: '&lt;span style=&quot;background-color: transparent;&quot;&gt;&lt;font style=&quot;color: rgb(204, 0, 102);&quot;&gt;@&amp;lt;org&amp;gt;/&amp;lt;project&amp;gt;/FeatureY&lt;/font&gt;&lt;/span&gt;&lt;span style=&quot;background-color: transparent; color: light-dark(rgb(0, 0, 0), rgb(255, 255, 255));&quot;&gt;',&lt;/span&gt;&lt;/div&gt;&lt;div&gt;&amp;nbsp; &amp;nbsp; &lt;font style=&quot;color: rgb(0, 153, 0);&quot;&gt;method1&lt;/font&gt;: () =&amp;gt; {&lt;/div&gt;&lt;div&gt;&lt;div&gt;&amp;nbsp; &amp;nbsp; &amp;nbsp; this.&lt;span style=&quot;background-color: transparent;&quot;&gt;&lt;font style=&quot;color: light-dark(rgb(204, 0, 102), rgb(255, 255, 255));&quot;&gt;mapping1&lt;/font&gt;&lt;/span&gt;&lt;span style=&quot;background-color: transparent; color: light-dark(rgb(0, 0, 0), rgb(255, 255, 255));&quot;&gt;.featureMethod()&lt;/span&gt;&lt;/div&gt;&lt;/div&gt;&lt;div&gt;&amp;nbsp; &amp;nbsp; &amp;nbsp; this['&lt;font style=&quot;color: rgb(153, 51, 255);&quot;&gt;&lt;span style=&quot;background-color: transparent;&quot;&gt;$#&lt;/span&gt;&lt;span style=&quot;background-color: transparent;&quot;&gt;@&amp;lt;org&amp;gt;/&amp;lt;project&amp;gt;/AspectX&lt;/span&gt;&lt;/font&gt;&lt;span style=&quot;background-color: transparent; color: light-dark(rgb(0, 0, 0), rgb(255, 255, 255));&quot;&gt;'&lt;/span&gt;&lt;span style=&quot;background-color: transparent; color: light-dark(rgb(0, 0, 0), rgb(255, 255, 255));&quot;&gt;]&lt;/span&gt;&lt;span style=&quot;background-color: transparent; color: light-dark(rgb(0, 0, 0), rgb(255, 255, 255));&quot;&gt;.instanceMethod2()&lt;/span&gt;&lt;/div&gt;&lt;div&gt;&amp;nbsp; &amp;nbsp; }&lt;/div&gt;&lt;div&gt;&amp;nbsp; }&lt;br&gt;}, {&lt;div&gt;&amp;nbsp; capsuleName: '&lt;font style=&quot;color: rgb(0, 102, 204);&quot;&gt;&lt;span style=&quot;background-color: transparent;&quot;&gt;@&amp;lt;org&amp;gt;/&amp;lt;project&amp;gt;/&lt;/span&gt;&lt;span style=&quot;background-color: transparent;&quot;&gt;MyCapsule&lt;/span&gt;&lt;/font&gt;&lt;span style=&quot;background-color: transparent; color: light-dark(rgb(0, 0, 0), rgb(255, 255, 255));&quot;&gt;'&lt;/span&gt;&lt;/div&gt;&lt;div&gt;&lt;div&gt;})&lt;/div&gt;&lt;/div&gt;&lt;/div&gt;&lt;div&gt;&lt;br&gt;&lt;/div&gt;&lt;div&gt;&lt;font style=&quot;color: rgb(0, 102, 204);&quot;&gt;capsule&lt;/font&gt;.&lt;span style=&quot;background-color: transparent;&quot;&gt;&lt;font style=&quot;color: light-dark(rgb(0, 153, 0), rgb(255, 255, 255));&quot;&gt;property1&lt;/font&gt;&lt;/span&gt;&lt;/div&gt;&lt;div&gt;&lt;font style=&quot;color: rgb(0, 102, 204);&quot;&gt;capsule&lt;/font&gt;.&lt;span style=&quot;background-color: transparent;&quot;&gt;&lt;font style=&quot;color: light-dark(rgb(0, 153, 0), rgb(255, 255, 255));&quot;&gt;method1&lt;/font&gt;&lt;/span&gt;&lt;span style=&quot;background-color: transparent; color: light-dark(rgb(0, 0, 0), rgb(255, 255, 255));&quot;&gt;()&lt;/span&gt;&lt;/div&gt;&lt;div&gt;&lt;div&gt;&lt;font style=&quot;color: rgb(0, 102, 204);&quot;&gt;capsule&lt;/font&gt;.&lt;span style=&quot;color: rgb(204, 0, 102); background-color: transparent;&quot;&gt;mapping1&lt;/span&gt;&lt;span style=&quot;background-color: transparent; color: light-dark(rgb(0, 0, 0), rgb(255, 255, 255));&quot;&gt;.featureMethod&lt;/span&gt;&lt;span style=&quot;background-color: transparent; color: light-dark(rgb(0, 0, 0), rgb(255, 255, 255));&quot;&gt;()&lt;/span&gt;&lt;/div&gt;&lt;/div&gt;&lt;div&gt;&lt;div&gt;&lt;div&gt;&lt;font style=&quot;color: rgb(0, 102, 204);&quot;&gt;capsule&lt;/font&gt;['&lt;font style=&quot;color: rgb(204, 102, 0);&quot;&gt;#@&amp;lt;org&amp;gt;/&amp;lt;project&amp;gt;/structs/StructA&lt;/font&gt;&lt;span style=&quot;background-color: transparent; color: light-dark(rgb(0, 0, 0), rgb(255, 255, 255));&quot;&gt;'&lt;/span&gt;&lt;span style=&quot;background-color: transparent; color: light-dark(rgb(0, 0, 0), rgb(255, 255, 255));&quot;&gt;].protoMethod1&lt;/span&gt;&lt;span style=&quot;background-color: transparent; color: light-dark(rgb(0, 0, 0), rgb(255, 255, 255));&quot;&gt;()&lt;/span&gt;&lt;/div&gt;&lt;/div&gt;&lt;div&gt;&lt;font style=&quot;color: rgb(0, 102, 204);&quot;&gt;capsule&lt;/font&gt;['&lt;font style=&quot;color: rgb(153, 51, 255);&quot;&gt;&lt;span style=&quot;background-color: transparent;&quot;&gt;$#&lt;/span&gt;&lt;span style=&quot;background-color: transparent;&quot;&gt;@&amp;lt;org&amp;gt;/&amp;lt;project&amp;gt;/AspectX&lt;/span&gt;&lt;/font&gt;&lt;span style=&quot;background-color: transparent; color: light-dark(rgb(0, 0, 0), rgb(255, 255, 255));&quot;&gt;'&lt;/span&gt;&lt;span style=&quot;background-color: transparent; color: light-dark(rgb(0, 0, 0), rgb(255, 255, 255));&quot;&gt;].&lt;/span&gt;instanceMethod2&lt;span style=&quot;background-color: transparent; color: light-dark(rgb(0, 0, 0), rgb(255, 255, 255));&quot;&gt;()&lt;/span&gt;&lt;/div&gt;&lt;/div&gt;" style="rounded=0;whiteSpace=wrap;html=1;align=left;fontFamily=Courier New;fontStyle=1;fontSize=14;spacingLeft=10;fillColor=#FFFCF4;" parent="1" vertex="1">
+                    <mxGeometry x="55" y="-765" width="520" height="370" as="geometry"/>
+                </mxCell>
+                <mxCell id="N3hJ6-WijfH2HfO5JL5S-26" value="" style="group;fillColor=default;" parent="1" connectable="0" vertex="1">
+                    <mxGeometry x="685" y="-750" width="340" height="340" as="geometry"/>
+                </mxCell>
+                <mxCell id="N3hJ6-WijfH2HfO5JL5S-20" value="" style="ellipse;whiteSpace=wrap;html=1;aspect=fixed;fillColor=#FFFCF4;" parent="N3hJ6-WijfH2HfO5JL5S-26" vertex="1">
+                    <mxGeometry width="340" height="340" as="geometry"/>
+                </mxCell>
+                <mxCell id="N3hJ6-WijfH2HfO5JL5S-9" style="rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=none;endFill=0;" parent="N3hJ6-WijfH2HfO5JL5S-26" source="N3hJ6-WijfH2HfO5JL5S-1" target="N3hJ6-WijfH2HfO5JL5S-5" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="N3hJ6-WijfH2HfO5JL5S-1" value="" style="ellipse;whiteSpace=wrap;html=1;aspect=fixed;" parent="N3hJ6-WijfH2HfO5JL5S-26" vertex="1">
+                    <mxGeometry x="120" y="50" width="20" height="20" as="geometry"/>
+                </mxCell>
+                <mxCell id="N3hJ6-WijfH2HfO5JL5S-17" style="rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=none;endFill=0;" parent="N3hJ6-WijfH2HfO5JL5S-26" source="N3hJ6-WijfH2HfO5JL5S-4" target="N3hJ6-WijfH2HfO5JL5S-16" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="N3hJ6-WijfH2HfO5JL5S-4" value="" style="ellipse;whiteSpace=wrap;html=1;aspect=fixed;fillColor=#dae8fc;strokeColor=#6c8ebf;" parent="N3hJ6-WijfH2HfO5JL5S-26" vertex="1">
+                    <mxGeometry x="50" y="180" width="20" height="20" as="geometry"/>
+                </mxCell>
+                <mxCell id="N3hJ6-WijfH2HfO5JL5S-10" style="rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=none;endFill=0;" parent="N3hJ6-WijfH2HfO5JL5S-26" source="N3hJ6-WijfH2HfO5JL5S-5" target="N3hJ6-WijfH2HfO5JL5S-7" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="N3hJ6-WijfH2HfO5JL5S-11" style="rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=none;endFill=0;entryX=0;entryY=0;entryDx=0;entryDy=0;" parent="N3hJ6-WijfH2HfO5JL5S-26" source="N3hJ6-WijfH2HfO5JL5S-5" target="N3hJ6-WijfH2HfO5JL5S-6" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="220" y="250" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="N3hJ6-WijfH2HfO5JL5S-12" style="rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=none;endFill=0;" parent="N3hJ6-WijfH2HfO5JL5S-26" source="N3hJ6-WijfH2HfO5JL5S-5" target="N3hJ6-WijfH2HfO5JL5S-8" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="N3hJ6-WijfH2HfO5JL5S-13" style="rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=none;endFill=0;" parent="N3hJ6-WijfH2HfO5JL5S-26" source="N3hJ6-WijfH2HfO5JL5S-5" target="N3hJ6-WijfH2HfO5JL5S-4" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="N3hJ6-WijfH2HfO5JL5S-5" value="" style="ellipse;whiteSpace=wrap;html=1;aspect=fixed;fillColor=#dae8fc;strokeColor=#6c8ebf;" parent="N3hJ6-WijfH2HfO5JL5S-26" vertex="1">
+                    <mxGeometry x="170" y="140" width="20" height="20" as="geometry"/>
+                </mxCell>
+                <mxCell id="N3hJ6-WijfH2HfO5JL5S-6" value="" style="ellipse;whiteSpace=wrap;html=1;aspect=fixed;" parent="N3hJ6-WijfH2HfO5JL5S-26" vertex="1">
+                    <mxGeometry x="230" y="250" width="20" height="20" as="geometry"/>
+                </mxCell>
+                <mxCell id="N3hJ6-WijfH2HfO5JL5S-7" value="" style="ellipse;whiteSpace=wrap;html=1;aspect=fixed;" parent="N3hJ6-WijfH2HfO5JL5S-26" vertex="1">
+                    <mxGeometry x="280" y="140" width="20" height="20" as="geometry"/>
+                </mxCell>
+                <mxCell id="N3hJ6-WijfH2HfO5JL5S-8" value="" style="ellipse;whiteSpace=wrap;html=1;aspect=fixed;fillColor=#dae8fc;strokeColor=#6c8ebf;" parent="N3hJ6-WijfH2HfO5JL5S-26" vertex="1">
+                    <mxGeometry x="90" y="260" width="20" height="20" as="geometry"/>
+                </mxCell>
+                <mxCell id="N3hJ6-WijfH2HfO5JL5S-14" style="rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=none;endFill=0;" parent="N3hJ6-WijfH2HfO5JL5S-26" source="N3hJ6-WijfH2HfO5JL5S-8" target="N3hJ6-WijfH2HfO5JL5S-6" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <mxPoint x="210" y="250" as="targetPoint"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="N3hJ6-WijfH2HfO5JL5S-18" style="rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=none;endFill=0;" parent="N3hJ6-WijfH2HfO5JL5S-26" source="N3hJ6-WijfH2HfO5JL5S-15" target="N3hJ6-WijfH2HfO5JL5S-7" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="N3hJ6-WijfH2HfO5JL5S-15" value="" style="ellipse;whiteSpace=wrap;html=1;aspect=fixed;fillColor=#dae8fc;strokeColor=#6c8ebf;" parent="N3hJ6-WijfH2HfO5JL5S-26" vertex="1">
+                    <mxGeometry x="220" y="80" width="20" height="20" as="geometry"/>
+                </mxCell>
+                <mxCell id="N3hJ6-WijfH2HfO5JL5S-16" value="" style="ellipse;whiteSpace=wrap;html=1;aspect=fixed;" parent="N3hJ6-WijfH2HfO5JL5S-26" vertex="1">
+                    <mxGeometry x="70" y="110" width="20" height="20" as="geometry"/>
+                </mxCell>
+                <mxCell id="N3hJ6-WijfH2HfO5JL5S-21" style="rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0.265;entryY=0.059;entryDx=0;entryDy=0;entryPerimeter=0;endArrow=none;endFill=0;dashed=1;strokeColor=#3399FF;" parent="N3hJ6-WijfH2HfO5JL5S-26" source="N3hJ6-WijfH2HfO5JL5S-1" target="N3hJ6-WijfH2HfO5JL5S-20" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="N3hJ6-WijfH2HfO5JL5S-22" style="rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0.997;entryY=0.585;entryDx=0;entryDy=0;entryPerimeter=0;endArrow=none;endFill=0;dashed=1;strokeColor=#3399FF;" parent="N3hJ6-WijfH2HfO5JL5S-26" source="N3hJ6-WijfH2HfO5JL5S-6" target="N3hJ6-WijfH2HfO5JL5S-20" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="N3hJ6-WijfH2HfO5JL5S-23" style="rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0.015;entryY=0.603;entryDx=0;entryDy=0;entryPerimeter=0;endArrow=none;endFill=0;dashed=1;strokeColor=#3399FF;" parent="N3hJ6-WijfH2HfO5JL5S-26" source="N3hJ6-WijfH2HfO5JL5S-4" target="N3hJ6-WijfH2HfO5JL5S-20" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="N3hJ6-WijfH2HfO5JL5S-31" value="(c) 2026 &lt;a href=&quot;https://christoph.diy&quot;&gt;Christoph.diy&lt;/a&gt;&amp;nbsp;CC BY" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=right;verticalAlign=middle;rounded=0;" parent="1" vertex="1">
+                    <mxGeometry x="880" y="-840" width="185" height="30" as="geometry"/>
+                </mxCell>
+                <mxCell id="N3hJ6-WijfH2HfO5JL5S-32" value="Encapsulate: Source Code / Semantic Graph Isomorphism - v0.1" style="text;html=1;whiteSpace=wrap;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;rounded=0;" parent="1" vertex="1">
+                    <mxGeometry x="360" y="-840" width="420" height="30" as="geometry"/>
+                </mxCell>
+            </root>
+        </mxGraphModel>
+    </diagram>
+</mxfile>

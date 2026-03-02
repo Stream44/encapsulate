@@ -27,13 +27,23 @@ It is being used to underpin:
   <br/><br/>
 </p>
 
+### Why
+
+When encoding a software system as a body (complete model), the body is structured through the declarative semantic schema and animated by functional processing in nodes.
+
+We need a minimal abstraction to conveniently author graph processing nodes.
+
+`encapsulate` provides such a primitive building block.
+
+![Source To Graph Isomorphism](./docs/SourceToGraphIsomorphism.svg)
+
+
 The CAPSULE Spine Contract
 ---
 
 The `encapsulate` library wraps TypeScript objects and binds reference trees for constructing executable component graphs.
 
-The binding rules are defined by **Spine Contracts**. The first *experimental* spine contract is the **Capsule Spine Contract**. It builds a model
-around **Capsules** which have certain properties.
+The binding rules are defined by **Spine Contracts**. The first *experimental* spine contract is the **Capsule Spine Contract**. It builds a model around **Capsules** which have certain properties.
 
 The capsule spine contract is implemented here: [src/spine-contracts/CapsuleSpineContract.v0/](src/spine-contracts/CapsuleSpineContract.v0/)
 
@@ -43,8 +53,6 @@ The capsule spine contract is implemented here: [src/spine-contracts/CapsuleSpin
 - [ ] Property annotations
 - [ ] Capsule Projectors
 - [ ] Load capsules from packs
-
-![Capsule Spine Contract Overview](./src/spine-contracts/CapsuleSpineContract.v0/Overview.svg)
 
 Provenance
 ===
