@@ -92,6 +92,42 @@ describe('Web API globals in capsule property functions', () => {
         expect(propDef.ambientReferences.ReadableStream.type).toBe('module-global')
     })
 
+    it('should allow globalThis and window as module-global builtins', async () => {
+        const { encapsulate, CapsulePropertyTypes, makeImportStack } = await CapsuleSpineFactory({
+            spineFilesystemRoot: join(import.meta.dir, '../../../../..'),
+            spineContracts: {
+                ['#' + CapsuleSpineContract['#']]: CapsuleSpineContract
+            }
+        })
+
+        const capsule1 = await encapsulate({
+            '#@stream44.studio/encapsulate/spine-contracts/CapsuleSpineContract.v0': {
+                '#': {
+                    checkGlobal: {
+                        type: CapsulePropertyTypes.Function,
+                        value: function (this: any): any {
+                            return { hasGlobalThis: typeof globalThis !== 'undefined', hasWindow: typeof window !== 'undefined' }
+                        }
+                    }
+                }
+            }
+        }, {
+            importMeta: import.meta,
+            importStack: makeImportStack(),
+        })
+
+        expect(capsule1).toBeDefined()
+
+        // Verify globalThis and window are recorded as module-global
+        const cst = (capsule1 as any).cst
+        const propDef = cst.spineContracts['#@stream44.studio/encapsulate/spine-contracts/CapsuleSpineContract.v0'].propertyContracts['#'].properties.checkGlobal
+        expect(propDef.ambientReferences).toBeDefined()
+        expect(propDef.ambientReferences.globalThis).toBeDefined()
+        expect(propDef.ambientReferences.globalThis.type).toBe('module-global')
+        expect(propDef.ambientReferences.window).toBeDefined()
+        expect(propDef.ambientReferences.window.type).toBe('module-global')
+    })
+
     it('should allow module-level imports used directly in property functions', async () => {
         const { encapsulate, run, CapsulePropertyTypes, makeImportStack } = await CapsuleSpineFactory({
             spineFilesystemRoot: join(import.meta.dir, '../../../../..'),

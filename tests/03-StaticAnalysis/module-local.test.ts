@@ -764,4 +764,24 @@ describe('Module-local function detection', () => {
         expect((capsule as any).cst.source.ambientReferences).not.toHaveProperty('Entry')
         expect((capsule as any).cst.source.ambientReferences).not.toHaveProperty('Mapping')
     })
+
+    it('should preserve export keyword on exported module-local const in moduleLocalCode', async () => {
+        const { encapsulate, CapsulePropertyTypes, makeImportStack } = await CapsuleSpineFactory({
+            spineFilesystemRoot: join(import.meta.dir, '../../../../..'),
+            spineContracts: {
+                ['#' + CapsuleSpineContract['#']]: CapsuleSpineContract
+            }
+        })
+
+        // Import the test capsule that has an exported const
+        const { capsule: testCapsuleFn } = await import('./exported-const.cap.js')
+
+        const capsule = await testCapsuleFn({ encapsulate, CapsulePropertyTypes, makeImportStack })
+
+        // Verify that MODEL_NAME is detected as a module-local variable
+        expect((capsule as any).cst.source.moduleLocalCode).toHaveProperty('MODEL_NAME')
+
+        // The moduleLocalCode should preserve the 'export' keyword from the source
+        expect((capsule as any).cst.source.moduleLocalCode.MODEL_NAME).toStartWith('export ')
+    })
 })

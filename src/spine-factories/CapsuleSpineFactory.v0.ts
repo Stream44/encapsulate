@@ -473,6 +473,7 @@ export async function CapsuleSpineFactory({
             },
         },
         spineFilesystemRoot,
+        capsuleModuleProjectionRoot,
         capsuleModuleProjectionPackage,
         timing
     }) : undefined

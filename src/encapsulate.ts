@@ -819,6 +819,21 @@ async function encapsulate(definition: TCapsuleDefinition, options: TCapsuleOpti
                             : sha256(cst?.capsuleSourceUriLineRef || encapsulateOptions.capsuleSourceLineRef),
                         sit
                     })
+
+                    // Propagate this (child) capsule's encapsulatedApi to all parent spine contract
+                    // instances up the extends chain, so parent functions can resolve child Function
+                    // properties via this (e.g. Engine.mergeNode calling this._mergeNode from QueryAPI).
+                    // Each ancestor accumulates child APIs so the proxy can check all levels.
+                    let ancestor = extendedCapsuleInstance
+                    while (ancestor) {
+                        for (const sci of Object.values(ancestor.spineContractCapsuleInstances || {})) {
+                            if (!(sci as any).childEncapsulatedApis) {
+                                (sci as any).childEncapsulatedApis = []
+                            }
+                            ; (sci as any).childEncapsulatedApis.push(encapsulatedApi)
+                        }
+                        ancestor = ancestor.extendedCapsuleInstance
+                    }
                 }
 
                 // Resolve the root capsule for this instance:

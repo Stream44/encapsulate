@@ -103,6 +103,7 @@ export function CapsuleModuleProjector({
     projectionStore,
     projectionCacheStore,
     spineFilesystemRoot,
+    capsuleModuleProjectionRoot,
     capsuleModuleProjectionPackage,
     timing
 }: {
@@ -120,6 +121,7 @@ export function CapsuleModuleProjector({
         getStats?: (filepath: string) => Promise<{ mtime: Date } | null>
     },
     spineFilesystemRoot: string,
+    capsuleModuleProjectionRoot?: string,
     capsuleModuleProjectionPackage?: string,
     timing?: { record: (step: string) => void, chalk?: any }
 }) {
@@ -739,6 +741,18 @@ export function CapsuleModuleProjector({
             delete ambientReferences['makeImportStack']
         }
 
+        // Compute the relative path from the projected caps file directory
+        // back to the original source file directory so that relative imports
+        // in the caps file resolve to the original source location.
+        const absSourceDir = dirname(join(spineFilesystemRoot, capsule.cst.source.moduleFilepath))
+        const projectionRoot = capsuleModuleProjectionRoot || spineFilesystemRoot
+        const absCapsDir = dirname(join(projectionRoot, filepath))
+        const capsToSourcePrefix = relative(absCapsDir, absSourceDir)
+        function rewriteRelativeModuleUri(moduleUri: string): string {
+            if (!moduleUri.startsWith('./') && !moduleUri.startsWith('../')) return moduleUri
+            return capsToSourcePrefix + '/' + moduleUri.replace(/^\.\//, '')
+        }
+
         const importStatements = Object.entries(ambientReferences)
             .map(([name, ref]: [string, any]) => {
                 if (ref.type === 'import') {
@@ -748,7 +762,7 @@ export function CapsuleModuleProjector({
                         const cssPath = cssImportMapping[ref.moduleUri] || ref.moduleUri
                         return `import '${cssPath}'`
                     }
-                    return `import ${ref.importSpecifier} from '${ref.moduleUri}'`
+                    return `import ${ref.importSpecifier} from '${rewriteRelativeModuleUri(ref.moduleUri)}'`
                 }
                 if (ref.type === 'assigned') {
                     // If the assignment comes from a spine-factory module, import from encapsulate.ts instead

@@ -202,6 +202,11 @@ const MODULE_GLOBAL_BUILTINS = new Set([
     'Intl',
     'WebAssembly',
 
+    // Global scope references
+    'globalThis',
+    'window',
+    'global',
+
     // Global functions
     'isNaN',
     'isFinite',

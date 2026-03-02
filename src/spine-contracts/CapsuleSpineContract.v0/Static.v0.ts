@@ -16,6 +16,7 @@ export class ContractCapsuleInstanceFactory {
     protected instanceRegistry?: CapsuleInstanceRegistry
     protected extendedCapsuleInstance?: any
     protected ownSelf?: any
+    public childEncapsulatedApis?: Record<string, any>[]
     protected runtimeSpineContracts?: Record<string, any>
     protected capsuleInstance?: any
     public structInitFunctions: Array<() => any> = []
@@ -373,6 +374,7 @@ export class ContractCapsuleInstanceFactory {
     protected createSelfProxy() {
         const extendedApi = this.extendedCapsuleInstance?.api
         const ownSelf = this.ownSelf
+        const factory = this
         return new Proxy(this.self, {
             get: (target: any, prop: string | symbol) => {
                 if (typeof prop === 'symbol') return target[prop]
@@ -388,8 +390,15 @@ export class ContractCapsuleInstanceFactory {
                 }
 
                 // Fall back to encapsulatedApi
-                if (prop in this.encapsulatedApi) {
-                    return this.encapsulatedApi[prop]
+                if (prop in factory.encapsulatedApi) {
+                    return factory.encapsulatedApi[prop]
+                }
+
+                // Fall back to child capsule APIs (for parent→child function delegation)
+                if (factory.childEncapsulatedApis) {
+                    for (const childApi of factory.childEncapsulatedApis) {
+                        if (prop in childApi) return childApi[prop]
+                    }
                 }
 
                 // Fall back to extended capsule's API
@@ -397,6 +406,35 @@ export class ContractCapsuleInstanceFactory {
                     return extendedApi[prop]
                 }
 
+                return undefined
+            },
+            ownKeys: (target: any) => {
+                const keys = new Set<string>(Object.keys(target))
+                for (const k of Object.keys(factory.encapsulatedApi)) keys.add(k)
+                if (factory.childEncapsulatedApis) {
+                    for (const childApi of factory.childEncapsulatedApis) {
+                        for (const k of Object.keys(childApi)) keys.add(k)
+                    }
+                }
+                if (extendedApi) {
+                    for (const k of Object.keys(extendedApi)) keys.add(k)
+                }
+                return [...keys]
+            },
+            set: (target: any, prop: string | symbol, value: any) => {
+                target[prop] = value
+                return true
+            },
+            getOwnPropertyDescriptor: (target: any, prop: string | symbol) => {
+                if (typeof prop === 'symbol') return Object.getOwnPropertyDescriptor(target, prop)
+                if (prop in target) return Object.getOwnPropertyDescriptor(target, prop)
+                if (prop in factory.encapsulatedApi) return { configurable: true, enumerable: true, writable: true, value: factory.encapsulatedApi[prop as string] }
+                if (factory.childEncapsulatedApis) {
+                    for (const childApi of factory.childEncapsulatedApis) {
+                        if (prop in childApi) return { configurable: true, enumerable: true, writable: true, value: childApi[prop as string] }
+                    }
+                }
+                if (extendedApi && prop in extendedApi) return { configurable: true, enumerable: true, writable: true, value: extendedApi[prop as string] }
                 return undefined
             }
         })
