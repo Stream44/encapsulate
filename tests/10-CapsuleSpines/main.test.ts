@@ -1,7 +1,8 @@
 
 import { describe, it, expect } from 'bun:test'
 import { join } from 'path'
-import { readFile } from 'fs/promises'
+import { existsSync } from 'fs'
+import { readFile, readdir } from 'fs/promises'
 import { CapsuleSpineFactory } from "../../src/spine-factories/CapsuleSpineFactory.v0"
 import { CapsuleSpineContract } from "../../src/spine-contracts/CapsuleSpineContract.v0/Membrane.v0"
 
@@ -288,6 +289,47 @@ describe('CapsuleSpine Linking Features', () => {
         )
         expect(directApiCall).toBeDefined()
         expect(directApiCall.caller.capsuleSourceUriLineRefInstanceId).toMatch(/^[0-9a-f]{64}$/)
+    })
+
+    it('structs/Capsule generates a CST file like any user-declared capsule', async () => {
+        const staticAnalysisDir = join(import.meta.dir, '.~o/encapsulate.dev/static-analysis')
+
+        // Find the structs/Capsule CST file — it should exist somewhere under static-analysis
+        const findCstFile = async (dir: string): Promise<string | null> => {
+            const entries = await readdir(dir, { withFileTypes: true })
+            for (const entry of entries) {
+                const full = join(dir, entry.name)
+                if (entry.isDirectory()) {
+                    const found = await findCstFile(full)
+                    if (found) return found
+                } else if (entry.name.includes('Capsule.ts') && entry.name.endsWith('.csts.json')) {
+                    const content = JSON.parse(await readFile(full, 'utf-8'))
+                    const firstKey = Object.keys(content)[0]
+                    if (content[firstKey]?.source?.capsuleName === '@stream44.studio/encapsulate/structs/Capsule') {
+                        return full
+                    }
+                }
+            }
+            return null
+        }
+
+        const cstFilePath = await findCstFile(staticAnalysisDir)
+        expect(cstFilePath).not.toBeNull()
+
+        // Verify CST content is well-formed
+        const cstContent = JSON.parse(await readFile(cstFilePath!, 'utf-8'))
+        const cstKey = Object.keys(cstContent)[0]
+        const cst = cstContent[cstKey]
+
+        expect(cst.capsuleSourceUriLineRef).toBe('@stream44.studio/encapsulate/structs/Capsule:18')
+        expect(cst.source.capsuleName).toBe('@stream44.studio/encapsulate/structs/Capsule')
+        expect(cst.source.moduleFilepath).toContain('structs/Capsule.ts')
+        expect(cst.spineContracts).toBeDefined()
+        expect(cst.spineContracts['#@stream44.studio/encapsulate/spine-contracts/CapsuleSpineContract.v0']).toBeDefined()
+
+        // Verify a corresponding CRT file also exists
+        const crtFilePath = cstFilePath!.replace('.csts.json', '.crts.json')
+        expect(existsSync(crtFilePath)).toBe(true)
     })
 
 })
