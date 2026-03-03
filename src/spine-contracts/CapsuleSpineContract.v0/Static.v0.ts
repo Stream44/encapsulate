@@ -206,9 +206,11 @@ export class ContractCapsuleInstanceFactory {
 
         // Check for existing instance in registry - reuse if available when no options
         // Pre-registration with null allows parent capsules to "claim" a slot before child capsules process
+        // Property contract delegates (structs) always get a fresh instance per parent capsule
         const capsuleName = mappedCapsule.encapsulateOptions?.capsuleName
+        const isCapsuleStruct = property.definition.propertyContractDelegate === '#@stream44.studio/encapsulate/structs/Capsule'
 
-        if (capsuleName && this.instanceRegistry) {
+        if (capsuleName && this.instanceRegistry && !isCapsuleStruct) {
             if (this.instanceRegistry.has(capsuleName)) {
                 const existingEntry = this.instanceRegistry.get(capsuleName)
 
@@ -315,12 +317,14 @@ export class ContractCapsuleInstanceFactory {
             runtimeSpineContracts: this.runtimeSpineContracts,
             rootCapsule: this.capsuleInstance?.rootCapsule,
             parentCapsuleSourceUriLineRefInstanceId: this.capsuleInstance?.capsuleSourceUriLineRefInstanceId,
-            sit: this.capsuleInstance?.sit
+            sit: this.capsuleInstance?.sit,
+            skipCache: isCapsuleStruct
         })
 
         // Register the instance (replaces null pre-registration marker)
         // Always register to make instance available for child capsules with deferred proxies
-        if (capsuleName && this.instanceRegistry) {
+        // Property contract delegates skip registry (each parent gets its own instance)
+        if (capsuleName && this.instanceRegistry && !isCapsuleStruct) {
             this.instanceRegistry.set(capsuleName, mappedInstance)
         }
 

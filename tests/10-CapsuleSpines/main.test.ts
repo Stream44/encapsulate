@@ -190,6 +190,25 @@ describe('CapsuleSpine Linking Features', () => {
         // from capsules without options (service1, service2 reuse Service)
         expect(instanceIds.length).toBeGreaterThanOrEqual(expectedCapsules.length)
 
+        // Every capsule instance that declares structs/Capsule should get its own
+        // structs/Capsule instance (just like a property contract mapping).
+        // The structs/Capsule instance should NOT be shared across parents.
+        const structsCapsuleInstances = instanceEntries.filter(
+            ([, e]) => (e as any).capsuleName === '@stream44.studio/encapsulate/structs/Capsule'
+        )
+        // Count non-structs/Capsule instances — each one declares structs/Capsule,
+        // so there should be one structs/Capsule instance per parent capsule instance
+        const nonStructInstances = instanceEntries.filter(
+            ([, e]) => (e as any).capsuleName !== '@stream44.studio/encapsulate/structs/Capsule'
+        )
+        expect(structsCapsuleInstances.length).toBe(nonStructInstances.length)
+
+        // Each structs/Capsule instance must have a unique parent
+        const structsCapsuleParents = structsCapsuleInstances.map(
+            ([, e]) => (e as any).parentCapsuleSourceUriLineRefInstanceId
+        )
+        expect(new Set(structsCapsuleParents).size).toBe(structsCapsuleParents.length)
+
         // Verify membrane events contain expected properties
         expect(membraneEvents.length).toBeGreaterThan(0)
 

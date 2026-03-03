@@ -642,33 +642,28 @@ export async function CapsuleSpineFactory({
                     const rootInstance = await capsule.makeInstance()
                     const capsuleInstances: Record<string, { capsuleName: string, capsuleSourceUriLineRef: string, parentCapsuleSourceUriLineRefInstanceId: string }> = {}
 
-                    // If the root instance has a sit with pre-populated capsuleInstances, use it directly
-                    if (rootInstance.sit?.capsuleInstances && Object.keys(rootInstance.sit.capsuleInstances).length > 0) {
-                        Object.assign(capsuleInstances, rootInstance.sit.capsuleInstances)
-                    } else {
-                        // Iterative stack-based collection from instance tree
-                        const stack: Array<{ instance: any, parentId: string }> = [{ instance: rootInstance, parentId: '' }]
-                        const visited = new Set<string>()
-                        while (stack.length > 0) {
-                            const { instance, parentId } = stack.pop()!
-                            if (!instance?.capsuleSourceUriLineRefInstanceId) continue
-                            const id = instance.capsuleSourceUriLineRefInstanceId
-                            if (visited.has(id)) continue
-                            visited.add(id)
+                    // Iterative stack-based collection from instance tree
+                    const stack: Array<{ instance: any, parentId: string }> = [{ instance: rootInstance, parentId: '' }]
+                    const visited = new Set<string>()
+                    while (stack.length > 0) {
+                        const { instance, parentId } = stack.pop()!
+                        if (!instance?.capsuleSourceUriLineRefInstanceId) continue
+                        const id = instance.capsuleSourceUriLineRefInstanceId
+                        if (visited.has(id)) continue
+                        visited.add(id)
 
-                            capsuleInstances[id] = {
-                                capsuleName: instance.capsuleName || '',
-                                capsuleSourceUriLineRef: instance.capsuleSourceUriLineRef || '',
-                                parentCapsuleSourceUriLineRefInstanceId: parentId
-                            }
+                        capsuleInstances[id] = {
+                            capsuleName: instance.capsuleName || '',
+                            capsuleSourceUriLineRef: instance.capsuleSourceUriLineRef || '',
+                            parentCapsuleSourceUriLineRefInstanceId: parentId
+                        }
 
-                            if (instance.extendedCapsuleInstance) {
-                                stack.push({ instance: instance.extendedCapsuleInstance, parentId: id })
-                            }
-                            if (instance.mappedCapsuleInstances) {
-                                for (const mapped of instance.mappedCapsuleInstances) {
-                                    stack.push({ instance: mapped, parentId: id })
-                                }
+                        if (instance.extendedCapsuleInstance) {
+                            stack.push({ instance: instance.extendedCapsuleInstance, parentId: id })
+                        }
+                        if (instance.mappedCapsuleInstances) {
+                            for (const mapped of instance.mappedCapsuleInstances) {
+                                stack.push({ instance: mapped, parentId: id })
                             }
                         }
                     }

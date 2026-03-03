@@ -55,7 +55,8 @@ type TCapsuleMakeInstanceOptions = {
         moduleFilepath: string
     },
     parentCapsuleSourceUriLineRefInstanceId?: string,
-    sit?: { capsuleInstances: Record<string, { capsuleName: string, capsuleSourceUriLineRef: string, parentCapsuleSourceUriLineRefInstanceId: string }> }
+    sit?: { capsuleInstances: Record<string, { capsuleName: string, capsuleSourceUriLineRef: string, parentCapsuleSourceUriLineRefInstanceId: string }> },
+    skipCache?: boolean
 }
 
 type TCapsule = {
@@ -554,13 +555,15 @@ async function encapsulate(definition: TCapsuleDefinition, options: TCapsuleOpti
         encapsulateOptions,
         cst,
         crt: crts?.[capsuleSourceLineRef],
-        makeInstance: async ({ overrides = {}, options = {}, runtimeSpineContracts, sharedSelf, rootCapsule, parentCapsuleSourceUriLineRefInstanceId, sit }: TCapsuleMakeInstanceOptions = {}) => {
+        makeInstance: async ({ overrides = {}, options = {}, runtimeSpineContracts, sharedSelf, rootCapsule, parentCapsuleSourceUriLineRefInstanceId, sit, skipCache }: TCapsuleMakeInstanceOptions = {}) => {
 
             // Create cache key based on parameters
             // When sharedSelf is provided, we must NOT cache because each extending capsule
             // needs its own instance with its own 'this' context (sharedSelf).
             // This is critical for the pattern where multiple structs extend the same parent.
-            const cacheKey = sharedSelf ? null : JSON.stringify({
+            // When skipCache is true (property contract delegates like structs/Capsule),
+            // each parent capsule must get its own unique instance.
+            const cacheKey = (sharedSelf || skipCache) ? null : JSON.stringify({
                 overrides,
                 options,
                 hasRuntimeContracts: !!runtimeSpineContracts
