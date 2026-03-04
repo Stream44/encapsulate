@@ -417,6 +417,7 @@ class MembraneContractCapsuleInstanceFactory extends ContractCapsuleInstanceFact
                 const event: any = {
                     event: 'get',
                     eventIndex: this.incrementEventIndex(),
+                    membrane: 'external',
                     target: {
                         capsuleSourceLineRef: this.encapsulateOptions.capsuleSourceLineRef,
                         spineContractCapsuleInstanceId: this.id,
@@ -445,6 +446,7 @@ class MembraneContractCapsuleInstanceFactory extends ContractCapsuleInstanceFact
                 const event: any = {
                     event: 'set',
                     eventIndex: this.incrementEventIndex(),
+                    membrane: 'external',
                     target: {
                         capsuleSourceLineRef: this.encapsulateOptions.capsuleSourceLineRef,
                         spineContractCapsuleInstanceId: this.id,
@@ -511,6 +513,7 @@ class MembraneContractCapsuleInstanceFactory extends ContractCapsuleInstanceFact
                         const callEvent: any = {
                             event: 'call',
                             eventIndex: this.incrementEventIndex(),
+                            membrane: 'external',
                             target: {
                                 capsuleSourceLineRef: this.encapsulateOptions.capsuleSourceLineRef,
                                 spineContractCapsuleInstanceId: this.id,
@@ -536,6 +539,7 @@ class MembraneContractCapsuleInstanceFactory extends ContractCapsuleInstanceFact
                         const resultEvent: any = {
                             event: 'call-result',
                             eventIndex: this.incrementEventIndex(),
+                            membrane: 'external',
                             callEventIndex: callEvent.eventIndex,
                             target: {
                                 spineContractCapsuleInstanceId: this.id,
@@ -552,6 +556,7 @@ class MembraneContractCapsuleInstanceFactory extends ContractCapsuleInstanceFact
                     const callEvent: any = {
                         event: 'call',
                         eventIndex: this.incrementEventIndex(),
+                        membrane: 'external',
                         target: {
                             capsuleSourceLineRef: this.encapsulateOptions.capsuleSourceLineRef,
                             spineContractCapsuleInstanceId: this.id,
@@ -588,6 +593,7 @@ class MembraneContractCapsuleInstanceFactory extends ContractCapsuleInstanceFact
                     const resultEvent: any = {
                         event: 'call-result',
                         eventIndex: this.incrementEventIndex(),
+                        membrane: 'external',
                         callEventIndex: callEvent.eventIndex,
                         target: {
                             spineContractCapsuleInstanceId: this.id,
@@ -637,6 +643,7 @@ class MembraneContractCapsuleInstanceFactory extends ContractCapsuleInstanceFact
                     const event: any = {
                         event: 'get',
                         eventIndex: this.incrementEventIndex(),
+                        membrane: 'external',
                         target: {
                             capsuleSourceLineRef: this.encapsulateOptions.capsuleSourceLineRef,
                             spineContractCapsuleInstanceId: this.id,
@@ -673,6 +680,7 @@ class MembraneContractCapsuleInstanceFactory extends ContractCapsuleInstanceFact
                 const event: any = {
                     event: 'get',
                     eventIndex: this.incrementEventIndex(),
+                    membrane: 'external',
                     target: {
                         capsuleSourceLineRef: this.encapsulateOptions.capsuleSourceLineRef,
                         spineContractCapsuleInstanceId: this.id,
@@ -716,6 +724,134 @@ class MembraneContractCapsuleInstanceFactory extends ContractCapsuleInstanceFact
                 configurable: true
             })
         }
+    }
+
+    protected override createSelfProxy() {
+        const extendedApi = this.extendedCapsuleInstance?.api
+        const ownSelf = this.ownSelf
+        const factory = this
+        return new Proxy(this.self, {
+            get: (target: any, prop: string | symbol) => {
+                if (typeof prop === 'symbol') return target[prop]
+
+                // 'self' property returns ownSelf (only this capsule's own properties)
+                if (prop === 'self' && ownSelf) {
+                    return ownSelf
+                }
+
+                // Determine the value source and get the value
+                let value: any
+                let source: 'self' | 'encapsulatedApi' | 'childApi' | 'extendedApi' | undefined
+
+                if (prop in target) {
+                    value = target[prop]
+                    source = 'self'
+                } else if (prop in factory.encapsulatedApi) {
+                    value = factory.encapsulatedApi[prop]
+                    source = 'encapsulatedApi'
+                } else if (factory.childEncapsulatedApis) {
+                    for (const childApi of factory.childEncapsulatedApis) {
+                        if (prop in childApi) {
+                            value = childApi[prop]
+                            source = 'childApi'
+                            break
+                        }
+                    }
+                }
+
+                if (source === undefined && extendedApi && prop in extendedApi) {
+                    value = extendedApi[prop]
+                    source = 'extendedApi'
+                }
+
+                // Only emit internal events if we're inside a function/getter execution (caller context is set)
+                // and the property is not a function (we don't want to emit get events for function references)
+                if (source && typeof value !== 'function' && this.getCurrentCallerContext()) {
+                    const event: any = {
+                        event: 'get',
+                        eventIndex: this.incrementEventIndex(),
+                        membrane: 'internal',
+                        target: {
+                            capsuleSourceLineRef: this.encapsulateOptions.capsuleSourceLineRef,
+                            spineContractCapsuleInstanceId: this.id,
+                            prop: prop as string,
+                        },
+                        value
+                    }
+
+                    if (this.capsuleSourceNameRef) {
+                        event.target.capsuleSourceNameRef = this.capsuleSourceNameRef
+                    }
+                    if (this.capsuleSourceNameRefHash) {
+                        event.target.capsuleSourceNameRefHash = this.capsuleSourceNameRefHash
+                    }
+
+                    this.addCallerContextToEvent(event)
+                    this.onMembraneEvent?.(event)
+                }
+
+                return value
+            },
+            ownKeys: (target: any) => {
+                const keys = new Set<string>(Object.keys(target))
+                for (const k of Object.keys(factory.encapsulatedApi)) keys.add(k)
+                if (factory.childEncapsulatedApis) {
+                    for (const childApi of factory.childEncapsulatedApis) {
+                        for (const k of Object.keys(childApi)) keys.add(k)
+                    }
+                }
+                if (extendedApi) {
+                    for (const k of Object.keys(extendedApi)) keys.add(k)
+                }
+                return [...keys]
+            },
+            set: (target: any, prop: string | symbol, value: any) => {
+                if (typeof prop === 'symbol') {
+                    target[prop] = value
+                    return true
+                }
+
+                // Emit internal set event if we're inside a function/getter execution
+                if (this.getCurrentCallerContext()) {
+                    const event: any = {
+                        event: 'set',
+                        eventIndex: this.incrementEventIndex(),
+                        membrane: 'internal',
+                        target: {
+                            capsuleSourceLineRef: this.encapsulateOptions.capsuleSourceLineRef,
+                            spineContractCapsuleInstanceId: this.id,
+                            prop: prop as string,
+                        },
+                        value
+                    }
+
+                    if (this.capsuleSourceNameRef) {
+                        event.target.capsuleSourceNameRef = this.capsuleSourceNameRef
+                    }
+                    if (this.capsuleSourceNameRefHash) {
+                        event.target.capsuleSourceNameRefHash = this.capsuleSourceNameRefHash
+                    }
+
+                    this.addCallerContextToEvent(event)
+                    this.onMembraneEvent?.(event)
+                }
+
+                target[prop] = value
+                return true
+            },
+            getOwnPropertyDescriptor: (target: any, prop: string | symbol) => {
+                if (typeof prop === 'symbol') return Object.getOwnPropertyDescriptor(target, prop)
+                if (prop in target) return Object.getOwnPropertyDescriptor(target, prop)
+                if (prop in factory.encapsulatedApi) return { configurable: true, enumerable: true, writable: true, value: factory.encapsulatedApi[prop as string] }
+                if (factory.childEncapsulatedApis) {
+                    for (const childApi of factory.childEncapsulatedApis) {
+                        if (prop in childApi) return { configurable: true, enumerable: true, writable: true, value: childApi[prop as string] }
+                    }
+                }
+                if (extendedApi && prop in extendedApi) return { configurable: true, enumerable: true, writable: true, value: extendedApi[prop as string] }
+                return undefined
+            }
+        })
     }
 
     private addCallerContextToEvent(event: any): void {
@@ -782,6 +918,20 @@ export function CapsuleSpineContract({
     let currentCallerContext: CallerContext | undefined = undefined
     const instanceRegistry: CapsuleInstanceRegistry = new Map()
 
+    // Re-entrancy guard: suppress event emission while inside an onMembraneEvent callback.
+    // This prevents consumers (e.g. JSON.stringify on event.value) from triggering proxy getters
+    // that would cause spurious recursive membrane events with wrong caller context and ordering.
+    let isEmittingEvent = false
+    const guardedOnMembraneEvent = onMembraneEvent ? (event: any) => {
+        if (isEmittingEvent) return
+        isEmittingEvent = true
+        try {
+            onMembraneEvent(event)
+        } finally {
+            isEmittingEvent = false
+        }
+    } : undefined
+
     return {
         '#': CapsuleSpineContract['#'],
         instanceRegistry,
@@ -796,7 +946,7 @@ export function CapsuleSpineContract({
                 freezeCapsule,
                 resolve,
                 importCapsule,
-                onMembraneEvent,
+                onMembraneEvent: guardedOnMembraneEvent,
                 enableCallerStackInference,
                 encapsulateOptions,
                 getEventIndex: () => eventIndex,

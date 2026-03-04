@@ -181,7 +181,6 @@ it('Membrane construction & execution', async function () {
         '[realm:Admin] Hello (capsule1): World',
         '[realm:Admin] Hello (capsule1): World',
     ])
-
     expect(membraneEvents.length).toBeGreaterThan(0)
     expect(membraneEvents[0].event).toBe('get')
     expect(membraneEvents[0].target.prop).toBe('username')
@@ -197,6 +196,133 @@ it('Membrane construction & execution', async function () {
     const callResultEvents = membraneEvents.filter((e: any) => e.event === 'call-result')
     expect(callResultEvents.length).toBeGreaterThan(0)
     expect(callResultEvents[0].result).toBe('[global] Hello (capsule1): World')
+
+    // Verify membrane property exists on all events
+    for (const event of membraneEvents) {
+        expect(event.membrane).toBeDefined()
+        expect(['external', 'internal']).toContain(event.membrane)
+    }
+
+    // Verify external events (direct API access)
+    const externalEvents = membraneEvents.filter((e: any) => e.membrane === 'external')
+    expect(externalEvents.length).toBeGreaterThan(0)
+
+    // Verify internal events (property access from within function bodies)
+    const internalEvents = membraneEvents.filter((e: any) => e.membrane === 'internal')
+    expect(internalEvents.length).toBeGreaterThan(0)
+
+    // The hello() function accesses this.realm and this.username internally
+    // These should be internal get events
+    const internalGetEvents = internalEvents.filter((e: any) => e.event === 'get')
+    expect(internalGetEvents.length).toBeGreaterThan(0)
+
+    // Verify internal get events have the expected properties
+    const realmInternalGet = internalGetEvents.find((e: any) => e.target.prop === 'realm')
+    expect(realmInternalGet).toBeDefined()
+    expect(realmInternalGet.membrane).toBe('internal')
+
+    const usernameInternalGet = internalGetEvents.find((e: any) => e.target.prop === 'username')
+    expect(usernameInternalGet).toBeDefined()
+    expect(usernameInternalGet.membrane).toBe('internal')
+
+    // ── Verify caller context is present on ALL non-result events ──────
+    // Every membrane event (except call-result) should have a caller object
+    // call-result events are emitted after function return and reference callEventIndex instead
+    const nonResultEvents = membraneEvents.filter((e: any) => e.event !== 'call-result')
+    for (const event of nonResultEvents) {
+        expect(event.caller).toBeDefined()
+        // caller must have either capsuleSourceLineRef (from capsule context) or filepath (from stack inference)
+        const hasCapsuleRef = event.caller.capsuleSourceLineRef !== undefined
+        const hasFilepath = event.caller.filepath !== undefined
+        expect(hasCapsuleRef || hasFilepath).toBe(true)
+    }
+
+    // Internal events should have capsule-level caller context (from the function that accessed the property)
+    for (const event of internalEvents) {
+        expect(event.caller).toBeDefined()
+        expect(event.caller.capsuleSourceLineRef).toBeDefined()
+        expect(event.caller.spineContractCapsuleInstanceId).toBeDefined()
+        expect(event.caller.prop).toBeDefined()
+    }
+
+    // Cross-capsule calls: when capsule2.hello() calls this.mappedCapsule.hello(),
+    // the external call on capsule1 should have capsule2 as the caller
+    const capsule1ExternalCalls = membraneEvents.filter((e: any) =>
+        e.event === 'call' && e.membrane === 'external' &&
+        e.target.capsuleSourceNameRef?.includes('capsule1') &&
+        e.caller?.capsuleSourceNameRef?.includes('capsule2')
+    )
+    expect(capsule1ExternalCalls.length).toBeGreaterThan(0)
+
+})
+
+
+it('Internal set events are emitted when functions modify properties', async function () {
+
+    const membraneEvents: any[] = []
+
+    const { encapsulate, freeze, CapsulePropertyTypes, makeImportStack, hoistSnapshot } = await CapsuleSpineFactory({
+        spineFilesystemRoot: join(import.meta.dir, '../../../../..'),
+        capsuleModuleProjectionRoot: import.meta.dir,
+        enableCallerStackInference: true,
+        spineContracts: {
+            ['#' + CapsuleSpineContract['#']]: CapsuleSpineContract
+        },
+        onMembraneEvent: (event: any) => membraneEvents.push(event)
+    })
+
+    const capsule = await encapsulate({
+        '#@stream44.studio/encapsulate/spine-contracts/CapsuleSpineContract.v0': {
+            '#@stream44.studio/encapsulate/structs/Capsule': {},
+            '#': {
+                counter: {
+                    type: CapsulePropertyTypes.Literal,
+                    value: 0
+                },
+                increment: {
+                    type: CapsulePropertyTypes.Function,
+                    value: function (this: any): number {
+                        this.counter++
+                        return this.counter
+                    }
+                }
+            }
+        }
+    }, {
+        importMeta: import.meta,
+        importStack: makeImportStack(),
+        capsuleName: 'internalSetCapsule'
+    })
+
+    const { run } = await hoistSnapshot({
+        snapshot: await freeze()
+    })
+
+    await run({}, async ({ apis }) => {
+        const api = apis[capsule.capsuleSourceLineRef]
+
+        // Call increment which internally sets this.counter
+        const result1 = api.increment()
+        expect(result1).toBe(1)
+
+        const result2 = api.increment()
+        expect(result2).toBe(2)
+    })
+
+    // Verify internal set events were emitted
+    const internalSetEvents = membraneEvents.filter((e: any) => e.event === 'set' && e.membrane === 'internal')
+    expect(internalSetEvents.length).toBe(2) // Two increment() calls
+
+    // Verify internal set events have correct properties
+    for (const event of internalSetEvents) {
+        expect(event.target.prop).toBe('counter')
+        expect(event.membrane).toBe('internal')
+    }
+
+    // Verify internal get events were also emitted (reading counter before incrementing)
+    // Note: this.counter++ does a read then write, so we get at least 2 internal get events
+    const internalGetEvents = membraneEvents.filter((e: any) => e.event === 'get' && e.membrane === 'internal' && e.target.prop === 'counter')
+    expect(internalGetEvents.length).toBeGreaterThanOrEqual(2)
 })
 
 
@@ -523,4 +649,271 @@ describe('Membrane Features', () => {
         })
     })
 
+})
+
+
+describe('Cross-capsule caller tracking and event sequencing', () => {
+
+    it('caller is the last function that triggered the access, not the original external caller', async () => {
+        const membraneEvents: any[] = []
+
+        const { encapsulate, freeze, CapsulePropertyTypes, makeImportStack, hoistSnapshot } = await CapsuleSpineFactory({
+            spineFilesystemRoot: join(import.meta.dir, '../../../../..'),
+            capsuleModuleProjectionRoot: import.meta.dir,
+            enableCallerStackInference: true,
+            spineContracts: {
+                ['#' + CapsuleSpineContract['#']]: CapsuleSpineContract
+            },
+            onMembraneEvent: (event: any) => membraneEvents.push(event)
+        })
+
+        // 3-level hierarchy: Root → User → LoginForm (mirrors the real Codepath model)
+        const { capsule: rootCapsuleFn } = await import('./caps/Root')
+        const root = await rootCapsuleFn({ encapsulate, CapsulePropertyTypes, makeImportStack })
+
+        const { run } = await hoistSnapshot({ snapshot: await freeze() })
+
+        await run({}, async ({ apis }) => {
+            apis[root.capsuleSourceLineRef].runModel()
+        })
+
+        // ── Event sequencing: events must be in eventIndex order ──────────
+        for (let i = 1; i < membraneEvents.length; i++) {
+            expect(membraneEvents[i].eventIndex).toBeGreaterThan(membraneEvents[i - 1].eventIndex)
+        }
+
+        // ── Caller tracking: internal set on loginForm._email should have loginForm.setEmail as caller ──
+        const internalSetEmail = membraneEvents.find((e: any) =>
+            e.event === 'set' && e.membrane === 'internal' && e.target.prop === '_email'
+        )
+        expect(internalSetEmail).toBeDefined()
+        expect(internalSetEmail.caller).toBeDefined()
+        expect(internalSetEmail.caller.capsuleSourceNameRef).toMatch(/LoginForm$/)
+        expect(internalSetEmail.caller.prop).toBe('setEmail')
+
+        // ── Caller tracking: the external call to loginForm.setEmail should have user.login as caller ──
+        const externalCallSetEmail = membraneEvents.find((e: any) =>
+            e.event === 'call' && e.membrane === 'external' && e.target.prop === 'setEmail'
+        )
+        expect(externalCallSetEmail).toBeDefined()
+        expect(externalCallSetEmail.caller).toBeDefined()
+        expect(externalCallSetEmail.caller.capsuleSourceNameRef).toMatch(/User$/)
+        expect(externalCallSetEmail.caller.prop).toBe('login')
+
+        // ── NO spurious external get events for _email/_password during function calls ──
+        // When setEmail runs this._email = value, only internal set should fire, not external get
+        const externalGetsOnEmailDuringSetEmail = membraneEvents.filter((e: any) =>
+            e.event === 'get' && e.membrane === 'external' && e.target.prop === '_email' &&
+            e.caller?.prop === 'login'
+        )
+        // External gets on _email with User.login as caller are spurious — they should not exist
+        // (if they do exist, the caller should be the actual function accessing the property, not user.login)
+        expect(externalGetsOnEmailDuringSetEmail.length).toBe(0)
+
+    })
+
+    it('re-entrancy guard prevents spurious events when onMembraneEvent touches event.value proxies', async () => {
+        const membraneEvents: any[] = []
+
+        const { encapsulate, freeze, CapsulePropertyTypes, makeImportStack, hoistSnapshot } = await CapsuleSpineFactory({
+            spineFilesystemRoot: join(import.meta.dir, '../../../../..'),
+            capsuleModuleProjectionRoot: import.meta.dir,
+            enableCallerStackInference: true,
+            spineContracts: {
+                ['#' + CapsuleSpineContract['#']]: CapsuleSpineContract
+            },
+            // Simulate standalone-rt: JSON.stringify event.value inside onMembraneEvent
+            // Without the re-entrancy guard, this would trigger proxy getters on capsule APIs
+            // and emit spurious recursive membrane events with wrong caller and ordering
+            onMembraneEvent: (event: any) => {
+                let safeValue: any = undefined
+                try {
+                    if (event.value !== undefined) {
+                        JSON.stringify(event.value)
+                        safeValue = event.value
+                    }
+                } catch {
+                    safeValue = typeof event.value === 'object' ? `[${typeof event.value}]` : String(event.value)
+                }
+                membraneEvents.push({
+                    ...event,
+                    value: safeValue
+                })
+            }
+        })
+
+        // 3-level hierarchy: Root → User → LoginForm
+        const { capsule: rootCapsuleFn } = await import('./caps/Root')
+        const root = await rootCapsuleFn({ encapsulate, CapsulePropertyTypes, makeImportStack })
+
+        const { run } = await hoistSnapshot({ snapshot: await freeze() })
+
+        await run({}, async ({ apis }) => {
+            apis[root.capsuleSourceLineRef].runModel()
+        })
+
+        // ── Event sequencing: events must be in eventIndex order ──────────
+        for (let i = 1; i < membraneEvents.length; i++) {
+            expect(membraneEvents[i].eventIndex).toBeGreaterThan(membraneEvents[i - 1].eventIndex)
+        }
+
+        // ── NO spurious external get events with wrong caller ──────────
+        const spuriousExternalGets = membraneEvents.filter((e: any) =>
+            e.event === 'get' && e.membrane === 'external' &&
+            (e.target.prop === '_email' || e.target.prop === '_password' || e.target.prop === '_error') &&
+            e.caller?.prop === 'login'
+        )
+        expect(spuriousExternalGets.length).toBe(0)
+
+        // ── Caller tracking still correct ──────────
+        const internalSetEmail = membraneEvents.find((e: any) =>
+            e.event === 'set' && e.membrane === 'internal' && e.target.prop === '_email'
+        )
+        expect(internalSetEmail).toBeDefined()
+        expect(internalSetEmail.caller).toBeDefined()
+        expect(internalSetEmail.caller.prop).toBe('setEmail')
+    })
+})
+
+
+describe('Caller info', () => {
+
+    it('caller info is present on all non-result membrane events (in-memory)', async () => {
+        // This tests the CapsuleSpineFactory membrane event emission directly
+        // to verify every event type has caller info
+        const membraneEvents: any[] = []
+
+        const { encapsulate, freeze, CapsulePropertyTypes, makeImportStack, hoistSnapshot } = await CapsuleSpineFactory({
+            spineFilesystemRoot: join(import.meta.dir, '../../../../..'),
+            capsuleModuleProjectionRoot: import.meta.dir,
+            enableCallerStackInference: true,
+            spineContracts: {
+                ['#' + CapsuleSpineContract['#']]: CapsuleSpineContract
+            },
+            onMembraneEvent: (event: any) => membraneEvents.push(event)
+        })
+
+        const capsule = await encapsulate({
+            '#@stream44.studio/encapsulate/spine-contracts/CapsuleSpineContract.v0': {
+                '#@stream44.studio/encapsulate/structs/Capsule': {},
+                '#': {
+                    counter: {
+                        type: CapsulePropertyTypes.Literal,
+                        value: 0
+                    },
+                    increment: {
+                        type: CapsulePropertyTypes.Function,
+                        value: function (this: any) {
+                            this.counter++
+                            return this.counter
+                        }
+                    },
+                }
+            }
+        }, {
+            importMeta: import.meta,
+            importStack: makeImportStack(),
+            capsuleName: 'caller-verify-capsule'
+        })
+
+        const { run } = await hoistSnapshot({ snapshot: await freeze() })
+
+        await run({}, async ({ apis }) => {
+            const api = apis[capsule.capsuleSourceLineRef]
+            api.increment()
+        })
+
+        // Verify all non-result events have caller
+        const nonResultEvents = membraneEvents.filter((e: any) => e.event !== 'call-result')
+        expect(nonResultEvents.length).toBeGreaterThan(0)
+        for (const event of nonResultEvents) {
+            expect(event.caller).toBeDefined()
+            const hasCapsuleRef = event.caller.capsuleSourceLineRef !== undefined
+            const hasFilepath = event.caller.filepath !== undefined
+            expect(hasCapsuleRef || hasFilepath).toBe(true)
+        }
+
+        // Specifically: internal events have capsule-level caller with prop
+        const internalEvents = membraneEvents.filter((e: any) => e.membrane === 'internal')
+        for (const event of internalEvents) {
+            expect(event.caller.capsuleSourceLineRef).toBeDefined()
+            expect(event.caller.spineContractCapsuleInstanceId).toBeDefined()
+            expect(event.caller.prop).toBe('increment')
+        }
+    })
+
+    it('runFromSnapshot does not affect caller info', async () => {
+        // Run twice: once with snapshot, once without — both should have identical caller info
+        const eventsWithSnapshot: any[] = []
+        const eventsWithoutSnapshot: any[] = []
+
+        for (const [useSnapshot, collector] of [[true, eventsWithSnapshot], [false, eventsWithoutSnapshot]] as const) {
+            const { encapsulate, freeze, CapsulePropertyTypes, makeImportStack, hoistSnapshot, run: spineRun } = await CapsuleSpineFactory({
+                spineFilesystemRoot: join(import.meta.dir, '../../../../..'),
+                capsuleModuleProjectionRoot: import.meta.dir,
+                enableCallerStackInference: true,
+                spineContracts: {
+                    ['#' + CapsuleSpineContract['#']]: CapsuleSpineContract
+                },
+                onMembraneEvent: (event: any) => collector.push(event)
+            })
+
+            const capsule = await encapsulate({
+                '#@stream44.studio/encapsulate/spine-contracts/CapsuleSpineContract.v0': {
+                    '#@stream44.studio/encapsulate/structs/Capsule': {},
+                    '#': {
+                        value: {
+                            type: CapsulePropertyTypes.Literal,
+                            value: 'test'
+                        },
+                        readValue: {
+                            type: CapsulePropertyTypes.Function,
+                            value: function (this: any) {
+                                return this.value
+                            }
+                        },
+                    }
+                }
+            }, {
+                importMeta: import.meta,
+                importStack: makeImportStack(),
+                capsuleName: 'snapshot-compare-capsule'
+            })
+
+            let run: any
+            if (useSnapshot) {
+                const { run: snapshotRun } = await hoistSnapshot({ snapshot: await freeze() })
+                run = snapshotRun
+            } else {
+                run = spineRun
+            }
+
+            await run({}, async ({ apis }: any) => {
+                const api = apis[capsule.capsuleSourceLineRef]
+                api.readValue()
+            })
+        }
+
+        // Both runs should produce the same number and types of events
+        expect(eventsWithSnapshot.length).toBe(eventsWithoutSnapshot.length)
+
+        // Both should have caller info on all non-result events
+        for (const events of [eventsWithSnapshot, eventsWithoutSnapshot]) {
+            const nonResultEvents = events.filter((e: any) => e.event !== 'call-result')
+            for (const event of nonResultEvents) {
+                expect(event.caller).toBeDefined()
+                const hasCapsuleRef = event.caller.capsuleSourceLineRef !== undefined
+                const hasFilepath = event.caller.filepath !== undefined
+                expect(hasCapsuleRef || hasFilepath).toBe(true)
+            }
+        }
+
+        // Internal events should have matching caller prop in both runs
+        const snapshotInternal = eventsWithSnapshot.filter((e: any) => e.membrane === 'internal')
+        const noSnapshotInternal = eventsWithoutSnapshot.filter((e: any) => e.membrane === 'internal')
+        expect(snapshotInternal.length).toBe(noSnapshotInternal.length)
+        for (let i = 0; i < snapshotInternal.length; i++) {
+            expect(snapshotInternal[i].caller.prop).toBe(noSnapshotInternal[i].caller.prop)
+        }
+    })
 })
