@@ -302,7 +302,7 @@ describe('CapsuleSpine Linking Features', () => {
                 if (entry.isDirectory()) {
                     const found = await findCstFile(full)
                     if (found) return found
-                } else if (entry.name.includes('Capsule.ts') && entry.name.endsWith('.csts.json')) {
+                } else if (entry.name.includes('Capsule') && entry.name.endsWith('.csts.json')) {
                     const content = JSON.parse(await readFile(full, 'utf-8'))
                     const firstKey = Object.keys(content)[0]
                     if (content[firstKey]?.source?.capsuleName === '@stream44.studio/encapsulate/structs/Capsule') {

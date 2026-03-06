@@ -244,25 +244,13 @@ export function StaticAnalyzer({
 
             const moduleFilepath = join(spineOptions.spineFilesystemRoot, encapsulateOptions.moduleFilepath)
 
-            // Determine the cache file path based on whether the module is external or internal
-            let cacheFilePath: string
-            const isExternal = encapsulateOptions.moduleFilepath.startsWith('../')
-            const hasNodeModules = encapsulateOptions.moduleFilepath.includes('node_modules/')
+            // Construct npm URI for the module upfront — used for cache paths and CST keys
+            const rawModuleUri: string = await constructNpmUri(moduleFilepath, spineOptions.spineFilesystemRoot) || encapsulateOptions.moduleFilepath
+            // Strip file extension from URI
+            const moduleUriWithoutExt = rawModuleUri.replace(/\.(ts|tsx|js|jsx)$/, '')
 
-            if (isExternal || hasNodeModules) {
-                // External module or node_modules path - construct npm URI
-                const npmUri = await constructNpmUri(moduleFilepath, spineOptions.spineFilesystemRoot)
-                if (npmUri) {
-                    // Prefix with o/npmjs.com/node_modules/ for external modules
-                    cacheFilePath = `o/npmjs.com/node_modules/${npmUri}`
-                } else {
-                    // Fallback to normalized path if npm URI construction fails
-                    cacheFilePath = normalize(encapsulateOptions.moduleFilepath).replace(/^\.\.\//, '').replace(/\.\.\//g, '')
-                }
-            } else {
-                // Internal module - use relative path as-is
-                cacheFilePath = encapsulateOptions.moduleFilepath
-            }
+            // Cache file path always uses npm URI (never filesystem-relative paths)
+            const cacheFilePath = moduleUriWithoutExt
 
             const capsuleSourceLineRef = `${cacheFilePath}:${encapsulateOptions.importStackLine}`
 
@@ -297,7 +285,8 @@ export function StaticAnalyzer({
                                 timing?.record(`StaticAnalyzer: Cache HIT for ${encapsulateOptions.moduleFilepath}`)
                                 return {
                                     csts: cachedCsts,
-                                    crts: JSON.parse(crtsContent)
+                                    crts: JSON.parse(crtsContent),
+                                    moduleUri: moduleUriWithoutExt
                                 }
                             }
                         }
@@ -369,24 +358,12 @@ export function StaticAnalyzer({
                         continue
                     }
 
-                    const capsuleSourceLineRef = `${encapsulateOptions.moduleFilepath}:${encapsulateOptions.importStackLine}`
-                    const capsuleSourceNameRef = encapsulateOptions.capsuleName && `${encapsulateOptions.moduleFilepath}:${encapsulateOptions.capsuleName}`
+                    // Use npm URI for all CST references (never filesystem-relative paths)
+                    const capsuleSourceLineRef = `${moduleUriWithoutExt}:${encapsulateOptions.importStackLine}`
+                    const capsuleSourceNameRef = encapsulateOptions.capsuleName && `${moduleUriWithoutExt}:${encapsulateOptions.capsuleName}`
                     const capsuleSourceNameRefHash = capsuleSourceNameRef && createHash('sha256').update(capsuleSourceNameRef).digest('hex')
 
-                    // Construct npm URI for the module - try for all modules
-                    let moduleUri: string | null = await constructNpmUri(moduleFilepath, spineOptions.spineFilesystemRoot)
-
-                    // If npm URI construction failed, fall back to moduleFilepath
-                    if (!moduleUri) {
-                        moduleUri = encapsulateOptions.moduleFilepath
-                    }
-
-                    // Strip file extension from URI
-                    const moduleUriWithoutExt = moduleUri.replace(/\.(ts|tsx|js|jsx)$/, '')
-                    const capsuleSourceUriLineRef = `${moduleUriWithoutExt}:${encapsulateOptions.importStackLine}`
-
-                    // Store moduleUri without extension
-                    moduleUri = moduleUriWithoutExt
+                    const capsuleSourceUriLineRef = capsuleSourceLineRef
 
                     // Extract the capsule expression text from the source
                     const capsuleExpression = call.getText(sourceFile)
@@ -407,7 +384,7 @@ export function StaticAnalyzer({
                         capsuleSourceUriLineRef,
                         source: {
                             moduleFilepath: encapsulateOptions.moduleFilepath,
-                            moduleUri,
+                            moduleUri: moduleUriWithoutExt,
                             capsuleName: encapsulateOptions.capsuleName,
                             declarationLine,
                             importStackLine: encapsulateOptions.importStackLine,
@@ -760,6 +737,7 @@ export function StaticAnalyzer({
             return {
                 csts,
                 crts,
+                moduleUri: moduleUriWithoutExt
             }
         }
     }

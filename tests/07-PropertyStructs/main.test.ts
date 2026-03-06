@@ -196,8 +196,8 @@ it('Membrane construction & execution', async function () {
     expect(membraneEvents.length).toBeGreaterThan(0)
     expect(membraneEvents[0].event).toBe('get')
     expect(membraneEvents[0].target.prop).toBe('username')
-    expect(membraneEvents[0].target.capsuleSourceLineRef).toMatch(/main\.test\.ts:69$/)
-    expect(membraneEvents[0].target.capsuleSourceNameRef).toMatch(/main\.test\.ts:capsule1$/)
+    expect(membraneEvents[0].target.capsuleSourceLineRef).toMatch(/main\.test:69$/)
+    expect(membraneEvents[0].target.capsuleSourceNameRef).toMatch(/main\.test:capsule1$/)
     expect(membraneEvents[0].target.capsuleSourceNameRefHash).toBe(capsule1Hash)
     expect(membraneEvents[0].value).toBe('World')
 
@@ -209,7 +209,7 @@ it('Membrane construction & execution', async function () {
     expect(callResultEvents.length).toBeGreaterThan(0)
     expect(callResultEvents[0].result).toBe('[global] Hello (capsule1): World')
 
-    const structEvents = membraneEvents.filter((e: any) => e.target?.capsuleSourceLineRef?.includes('structs/Capsule.ts'))
+    const structEvents = membraneEvents.filter((e: any) => e.target?.capsuleSourceLineRef?.includes('structs/Capsule'))
     expect(structEvents.length).toBeGreaterThan(0)
 })
 

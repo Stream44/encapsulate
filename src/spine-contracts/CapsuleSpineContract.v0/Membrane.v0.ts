@@ -140,11 +140,16 @@ class MembraneContractCapsuleInstanceFactory extends ContractCapsuleInstanceFact
 
         // delegateOptions is set by encapsulate.ts for property contract delegates
         // options can be a function or an object for regular mappings
-        // Always pass { self, constants } - self is populated when depends is specified, empty otherwise
+        // Always pass { self, constants } - self contains full parent self when depends is specified,
+        // otherwise just the Capsule metadata struct (moduleFilepath, capsuleName, etc.)
         const optionsFn = property.definition.options
+        const capsuleStructKey = '#@stream44.studio/encapsulate/structs/Capsule'
+        const minimalSelf = this.self[capsuleStructKey]
+            ? { [capsuleStructKey]: this.self[capsuleStructKey] }
+            : {}
         const mappingOptions = property.definition.delegateOptions
             || (typeof optionsFn === 'function'
-                ? await optionsFn({ self: property.definition.depends ? this.self : {}, constants })
+                ? await optionsFn({ self: property.definition.depends ? this.self : minimalSelf, constants })
                 : optionsFn)
 
         // Check for existing instance in registry - reuse if available (regardless of options)

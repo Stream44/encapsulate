@@ -308,8 +308,8 @@ prop: {
 - **`options`** — forwarded to the mapped capsule. Keys starting with `'#'` target the mapped capsule's own property contracts. Keys without `'#'` are matched against capsule names deeper in the mapping tree (nested capsule-name-targeted options).
 - **`options({ self, constants })`** — when `options` is a function, it receives `{ self, constants }`.
   - `constants` — all `Literal`/`String` values from the mapped capsule's definition.
-  - `self` — the parent capsule's `self` object with resolved sibling mappings. Only populated when `depends` is specified (empty `{}` otherwise).
-- **`depends`** — array of sibling property names that must be resolved before this mapping's `options` function runs. Enables `options({ self })` to access already-resolved siblings (e.g. `self.$auth.realm`) and the Capsule metadata struct (e.g. `self['#@stream44.studio/encapsulate/structs/Capsule'].capsuleName`). Can be declared explicitly or auto-injected by the static analyzer when it detects `self.<name>` references in the options function body.
+  - `self` — always contains the Capsule metadata struct (`self['#@stream44.studio/encapsulate/structs/Capsule']` with `moduleFilepath`, `capsuleName`, etc.). When `depends` is specified, `self` also contains the full parent capsule's resolved sibling mappings.
+- **`depends`** — array of sibling property names that must be resolved before this mapping's `options` function runs. Enables `options({ self })` to access already-resolved siblings (e.g. `self.$auth.realm`). Can be declared explicitly or auto-injected by the static analyzer when it detects `self.<name>` references in the options function body.
 - **Instance reuse** — named capsules are registered in an instance registry. If a capsule with the same name is mapped multiple times without options, the existing instance is reused via a deferred proxy.
 
 Mapped capsules are accessible via `this.<prop>` (unwrapped API) and `api.<prop>` (raw instance with `.api`).

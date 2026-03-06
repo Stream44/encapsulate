@@ -174,7 +174,7 @@ export function CapsuleModuleProjector({
                             for (const [key, potentialCapsule] of Object.entries(capsules)) {
                                 if (potentialCapsule === capsule) continue
 
-                                const mappedModulePath = potentialCapsule.cst?.source?.moduleFilepath
+                                const mappedModulePath = potentialCapsule.cst?.source?.moduleUri
 
                                 if (mappedModulePath && (
                                     mappedModulePath === mappingValue ||
@@ -224,7 +224,7 @@ export function CapsuleModuleProjector({
                                         for (const [key, potentialCapsule] of Object.entries(capsules)) {
                                             if (potentialCapsule === capsule) continue
 
-                                            const mappedModulePath = potentialCapsule.cst?.source?.moduleFilepath
+                                            const mappedModulePath = potentialCapsule.cst?.source?.moduleUri
 
                                             if (mappedModulePath && (
                                                 mappedModulePath === mappingValue ||
@@ -515,7 +515,7 @@ export function CapsuleModuleProjector({
             projectingCapsules.add(capsuleId)
         }
 
-        timing?.record(`Projector: Start projection for ${capsule.cst.source.moduleFilepath}`)
+        timing?.record(`Projector: Start projection for ${capsule.cst.source.moduleUri || capsule.cst.source.moduleFilepath}`)
 
         // Only project capsules that have the Capsule struct property
         const spineContract = capsule.cst.spineContracts[spineContractUri]
@@ -571,10 +571,10 @@ export function CapsuleModuleProjector({
                         if (allProjectedFilesExist) {
                             // Restore snapshotValues from cache
                             Object.assign(snapshotValues, merge(snapshotValues, cachedData.snapshotData))
-                            timing?.record(`Projector: Cache HIT for ${capsule.cst.source.moduleFilepath}`)
+                            timing?.record(`Projector: Cache HIT for ${capsule.cst.source.moduleUri || capsule.cst.source.moduleFilepath}`)
                             return true
                         } else {
-                            timing?.record(timing?.chalk?.yellow?.(`Projector: Cache INVALID (projected files missing) for ${capsule.cst.source.moduleFilepath}`))
+                            timing?.record(timing?.chalk?.yellow?.(`Projector: Cache INVALID (projected files missing) for ${capsule.cst.source.moduleUri || capsule.cst.source.moduleFilepath}`))
                         }
                     }
                 }
@@ -588,7 +588,7 @@ export function CapsuleModuleProjector({
 
                         // Check if this capsule has the Capsule struct (meaning it should be projected)
                         if (potentialMappedCapsule.cst?.spineContracts?.[spineContractUri]?.propertyContracts?.['#@stream44.studio/encapsulate/structs/Capsule']) {
-                            // Check if this capsule's moduleFilepath is referenced in any mapping property
+                            // Check if this capsule's moduleUri is referenced in any mapping property
                             const mappedModulePath = potentialMappedCapsule.cst.source.moduleFilepath
 
                             for (const [propContractKey, propContract] of Object.entries(spineContract.propertyContracts)) {
@@ -612,7 +612,7 @@ export function CapsuleModuleProjector({
                         }
                     }
                 }
-                timing?.record(timing?.chalk?.red?.(`Projector: Cache MISS for ${capsule.cst.source.moduleFilepath}`))
+                timing?.record(timing?.chalk?.red?.(`Projector: Cache MISS for ${capsule.cst.source.moduleUri || capsule.cst.source.moduleFilepath}`))
             } catch (error) {
                 // Cache miss or error, proceed with projection
             }
@@ -633,13 +633,13 @@ export function CapsuleModuleProjector({
 
             const cstJson = JSON.stringify(targetCapsule.cst, null, 4)
             const crtJson = JSON.stringify(targetCapsule.crt || {}, null, 4)
-            const moduleFilepath = targetCapsule.cst.source.moduleFilepath
+            const moduleUri = targetCapsule.cst.source.moduleUri
             const importStackLine = targetCapsule.cst.source.importStackLine
 
-            // Replace importMeta: import.meta with moduleFilepath: '...'
+            // Replace importMeta: import.meta with moduleFilepath: '...' (using npm URI)
             expression = expression.replace(
                 /importMeta:\s*import\.meta/g,
-                `moduleFilepath: '${moduleFilepath}'`
+                `moduleFilepath: '${moduleUri}'`
             )
 
             // Replace importStack: makeImportStack() with importStackLine: ..., crt: {...}, cst: {...}
@@ -1662,7 +1662,7 @@ ${mappedDefaultExport}
                 await projectionCacheStore.writeFile(cacheFilename, JSON.stringify(cacheData, null, 2))
             } catch (error) {
                 // Cache write error, continue without failing
-                console.warn(`Warning: Failed to write projection cache for ${capsule.cst.source.moduleFilepath}:`, error)
+                console.warn(`Warning: Failed to write projection cache for ${capsule.cst.source.moduleUri || capsule.cst.source.moduleFilepath}:`, error)
             }
         }
 
@@ -1749,7 +1749,7 @@ capsule['#'] = ${JSON.stringify(capsuleName)}
                         await projectionStore.writeFile(projectedPath, capsuleFileContent)
                     }
                 } catch (error) {
-                    console.warn(`Warning: Failed to write projection cache for capsule ${registryCapsule.cst.source.moduleFilepath}:`, error)
+                    console.warn(`Warning: Failed to write projection cache for capsule ${registryCapsule.cst.source.moduleUri || registryCapsule.cst.source.moduleFilepath}:`, error)
                 }
             }
         }

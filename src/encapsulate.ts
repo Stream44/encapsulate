@@ -1,7 +1,7 @@
 
 // CACHE_BUST_VERSION: Increment this whenever CST cache must be invalidated due to structural changes
 // This ensures projected capsules are regenerated when the CST format changes
-const CACHE_BUST_VERSION = 21
+const CACHE_BUST_VERSION = 22
 
 type TSpineOptions = {
     spineFilesystemRoot?: string,
@@ -505,21 +505,30 @@ async function encapsulate(definition: TCapsuleDefinition, options: TCapsuleOpti
 
     if (typeof importStackLine !== 'number') throw new Error(`Could not determine importStackLine from options`)
 
-    const capsuleSourceLineRef = `${moduleFilepath}:${importStackLine}`
+    // Temporary filesystem-based ref used only for passing to static analyzer
+    const fsBasedRef = `${moduleFilepath}:${importStackLine}`
 
     spine.spineOptions.timing?.record(`Encapsulate: Start for ${moduleFilepath}`)
 
-    const { csts, crts } = await spine.spineOptions.staticAnalyzer?.parseModule({
+    const parseResult = await spine.spineOptions.staticAnalyzer?.parseModule({
         spineOptions: spine.spineOptions,
         encapsulateOptions: {
             moduleFilepath,
             importStackLine,
-            capsuleSourceLineRef,
+            capsuleSourceLineRef: fsBasedRef,
             capsuleName: options.capsuleName,
             ambientReferences: options.ambientReferences,
             cacheBustVersion: CACHE_BUST_VERSION
         }
-    }) || {
+    })
+
+    // Use moduleUri from static analyzer for npm URI-based capsuleSourceLineRef
+    const moduleUri = parseResult?.moduleUri
+    const capsuleSourceLineRef = moduleUri
+        ? `${moduleUri}:${importStackLine}`
+        : fsBasedRef
+
+    const { csts, crts } = parseResult || {
         csts: options.cst ? { [capsuleSourceLineRef]: options.cst } : undefined,
         crts: options.crt ? { [capsuleSourceLineRef]: options.crt } : undefined
     }

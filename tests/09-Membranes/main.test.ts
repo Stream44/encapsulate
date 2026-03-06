@@ -184,8 +184,8 @@ it('Membrane construction & execution', async function () {
     expect(membraneEvents.length).toBeGreaterThan(0)
     expect(membraneEvents[0].event).toBe('get')
     expect(membraneEvents[0].target.prop).toBe('username')
-    expect(membraneEvents[0].target.capsuleSourceLineRef).toMatch(/main\.test\.ts:67$/)
-    expect(membraneEvents[0].target.capsuleSourceNameRef).toMatch(/main\.test\.ts:capsule1$/)
+    expect(membraneEvents[0].target.capsuleSourceLineRef).toMatch(/main\.test:67$/)
+    expect(membraneEvents[0].target.capsuleSourceNameRef).toMatch(/main\.test:capsule1$/)
     expect(membraneEvents[0].target.capsuleSourceNameRefHash).toBeTruthy()
     expect(membraneEvents[0].value).toBe('World')
 
