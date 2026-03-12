@@ -981,6 +981,11 @@ CapsuleSpineContract['#'] = '@stream44.studio/encapsulate/spine-contracts/Capsul
 const npmUriCache = new Map<string, string | null>()
 
 function constructNpmUriSync(absoluteFilepath: string): string | null {
+    // Only process absolute paths — skip V8 internal markers like "native", "node:*", etc.
+    if (!absoluteFilepath.startsWith('/')) {
+        return null
+    }
+
     // Check for /node_modules/ in the path — use the last occurrence to handle nested node_modules
     const nodeModulesMarker = '/node_modules/'
     const lastIdx = absoluteFilepath.lastIndexOf(nodeModulesMarker)
