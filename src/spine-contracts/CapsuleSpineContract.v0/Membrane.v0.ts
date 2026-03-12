@@ -1,5 +1,7 @@
 import { CapsulePropertyTypes } from "../../encapsulate"
 import { ContractCapsuleInstanceFactory, CapsuleInstanceRegistry } from "./Static.v0"
+import { readFileSync, existsSync } from "node:fs"
+import { dirname, relative, join } from "node:path"
 
 type CallerContext = {
     capsuleSourceLineRef: string
@@ -8,9 +10,9 @@ type CallerContext = {
     capsuleSourceNameRefHash?: string
     capsuleSourceUriLineRefInstanceId?: string
     prop?: string
-    filepath?: string
+    fileUri?: string
     line?: number
-    stack?: Array<{ function?: string, filepath?: string, line?: number, column?: number }>
+    stack?: Array<{ function?: string, fileUri?: string, line?: number, column?: number }>
 }
 
 function CapsuleMembrane(target: Record<string, any>, hooks?: {
@@ -185,7 +187,7 @@ class MembraneContractCapsuleInstanceFactory extends ContractCapsuleInstanceFact
                                         const stackFrames = parseCallerFromStack(stackStr, this.spineFilesystemRoot)
                                         if (stackFrames.length > 0) {
                                             const callerInfo = extractCallerInfo(stackFrames, 3)
-                                            callerCtx.filepath = callerInfo.filepath
+                                            callerCtx.fileUri = callerInfo.fileUri
                                             callerCtx.line = callerInfo.line
                                             callerCtx.stack = stackFrames
                                         }
@@ -312,7 +314,7 @@ class MembraneContractCapsuleInstanceFactory extends ContractCapsuleInstanceFact
                             const stackFrames = parseCallerFromStack(stackStr, this.spineFilesystemRoot)
                             if (stackFrames.length > 0) {
                                 const callerInfo = extractCallerInfo(stackFrames, 3)
-                                callerCtx.filepath = callerInfo.filepath
+                                callerCtx.fileUri = callerInfo.fileUri
                                 callerCtx.line = callerInfo.line
                                 callerCtx.stack = stackFrames
                             }
@@ -375,7 +377,7 @@ class MembraneContractCapsuleInstanceFactory extends ContractCapsuleInstanceFact
                                         const stackFrames = parseCallerFromStack(stackStr, this.spineFilesystemRoot)
                                         if (stackFrames.length > 0) {
                                             const callerInfo = extractCallerInfo(stackFrames, 3)
-                                            callerCtx.filepath = callerInfo.filepath
+                                            callerCtx.fileUri = callerInfo.fileUri
                                             callerCtx.line = callerInfo.line
                                             callerCtx.stack = stackFrames
                                         }
@@ -878,8 +880,8 @@ class MembraneContractCapsuleInstanceFactory extends ContractCapsuleInstanceFact
             if (callerCtx.prop) {
                 event.caller.prop = callerCtx.prop
             }
-            if (callerCtx.filepath) {
-                event.caller.filepath = callerCtx.filepath
+            if (callerCtx.fileUri) {
+                event.caller.fileUri = callerCtx.fileUri
             }
             if (callerCtx.line) {
                 event.caller.line = callerCtx.line
@@ -975,9 +977,62 @@ CapsuleSpineContract['#'] = '@stream44.studio/encapsulate/spine-contracts/Capsul
 
 
 
-function parseCallerFromStack(stack: string, spineFilesystemRoot?: string): Array<{ function?: string, filepath?: string, line?: number, column?: number }> {
+// Cache for synchronous npm URI lookups (directory -> package name or null)
+const npmUriCache = new Map<string, string | null>()
+
+function constructNpmUriSync(absoluteFilepath: string): string | null {
+    // Check for /node_modules/ in the path — use the last occurrence to handle nested node_modules
+    const nodeModulesMarker = '/node_modules/'
+    const lastIdx = absoluteFilepath.lastIndexOf(nodeModulesMarker)
+    if (lastIdx !== -1) {
+        return absoluteFilepath.substring(lastIdx + nodeModulesMarker.length)
+    }
+
+    let currentDir = dirname(absoluteFilepath)
+    const maxDepth = 20
+
+    for (let i = 0; i < maxDepth; i++) {
+        if (npmUriCache.has(currentDir)) {
+            const cachedName = npmUriCache.get(currentDir)
+            if (cachedName) {
+                const relativeFromPackage = relative(currentDir, absoluteFilepath)
+                return `${cachedName}/${relativeFromPackage}`
+            }
+            // null means no package.json with name found at this level, continue up
+            const parentDir = dirname(currentDir)
+            if (parentDir === currentDir) break
+            currentDir = parentDir
+            continue
+        }
+
+        const packageJsonPath = join(currentDir, 'package.json')
+        try {
+            if (existsSync(packageJsonPath)) {
+                const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf-8'))
+                const packageName = packageJson.name
+                npmUriCache.set(currentDir, packageName || null)
+                if (packageName) {
+                    const relativeFromPackage = relative(currentDir, absoluteFilepath)
+                    return `${packageName}/${relativeFromPackage}`
+                }
+            } else {
+                npmUriCache.set(currentDir, null)
+            }
+        } catch {
+            npmUriCache.set(currentDir, null)
+        }
+
+        const parentDir = dirname(currentDir)
+        if (parentDir === currentDir) break
+        currentDir = parentDir
+    }
+
+    return null
+}
+
+function parseCallerFromStack(stack: string, spineFilesystemRoot?: string): Array<{ function?: string, fileUri?: string, line?: number, column?: number }> {
     const lines = stack.split('\n')
-    const result: Array<{ function?: string, filepath?: string, line?: number, column?: number }> = []
+    const result: Array<{ function?: string, fileUri?: string, line?: number, column?: number }> = []
 
     // Skip first line (Error message), then collect ALL frames
     for (let i = 1; i < lines.length; i++) {
@@ -989,8 +1044,10 @@ function parseCallerFromStack(stack: string, spineFilesystemRoot?: string): Arra
         // "at functionName (file:line:column)"
         const match = line.match(/at\s+(.+)/)
         if (match) {
-            const frame: { function?: string, filepath?: string, line?: number, column?: number } = {}
+            const frame: { function?: string, fileUri?: string, line?: number, column?: number } = {}
             const content = match[1]
+
+            let rawFilepath: string | undefined
 
             // Try to extract function name and location
             const funcMatch = content.match(/^(.+?)\s+\((.+)\)$/)
@@ -1004,7 +1061,7 @@ function parseCallerFromStack(stack: string, spineFilesystemRoot?: string): Arra
                 const location = funcMatch[2]
                 const locMatch = location.match(/^(.+):(\d+):(\d+)$/)
                 if (locMatch) {
-                    frame.filepath = locMatch[1]
+                    rawFilepath = locMatch[1]
                     frame.line = parseInt(locMatch[2], 10)
                     frame.column = parseInt(locMatch[3], 10)
                 }
@@ -1012,25 +1069,32 @@ function parseCallerFromStack(stack: string, spineFilesystemRoot?: string): Arra
                 // No function name: "/path/to/file:line:column"
                 const locMatch = content.match(/^(.+):(\d+):(\d+)$/)
                 if (locMatch) {
-                    frame.filepath = locMatch[1]
+                    rawFilepath = locMatch[1]
                     frame.line = parseInt(locMatch[2], 10)
                     frame.column = parseInt(locMatch[3], 10)
                 }
             }
 
-            // Convert absolute paths to relative paths if spineFilesystemRoot is provided
-            if (frame.filepath && spineFilesystemRoot) {
-                if (frame.filepath.startsWith(spineFilesystemRoot)) {
-                    frame.filepath = frame.filepath.slice(spineFilesystemRoot.length)
-                    // Remove leading slash if present
-                    if (frame.filepath.startsWith('/')) {
-                        frame.filepath = frame.filepath.slice(1)
+            // Convert absolute filepaths to npm URIs
+            if (rawFilepath) {
+                const npmUri = constructNpmUriSync(rawFilepath)
+                if (npmUri) {
+                    // Strip file extension from URI for consistency
+                    frame.fileUri = npmUri.replace(/\.(ts|tsx|js|jsx)$/, '')
+                } else if (spineFilesystemRoot && rawFilepath.startsWith(spineFilesystemRoot)) {
+                    // Fallback: use relative path from spine root if npm URI not resolvable
+                    let relativePath = rawFilepath.slice(spineFilesystemRoot.length)
+                    if (relativePath.startsWith('/')) {
+                        relativePath = relativePath.slice(1)
                     }
+                    frame.fileUri = relativePath
+                } else {
+                    frame.fileUri = rawFilepath
                 }
             }
 
             // Include all frames, even if incomplete
-            if (frame.filepath || frame.function) {
+            if (frame.fileUri || frame.function) {
                 result.push(frame)
             }
         }
@@ -1038,14 +1102,14 @@ function parseCallerFromStack(stack: string, spineFilesystemRoot?: string): Arra
     return result
 }
 
-function extractCallerInfo(stack: Array<{ function?: string, filepath?: string, line?: number, column?: number }>, offset: number = 0) {
+function extractCallerInfo(stack: Array<{ function?: string, fileUri?: string, line?: number, column?: number }>, offset: number = 0) {
     // Use offset to skip frames in the stack
     // offset 0 = first frame, offset 1 = second frame, etc.
 
     if (offset < stack.length) {
         const frame = stack[offset]
         return {
-            filepath: frame.filepath,
+            fileUri: frame.fileUri,
             line: frame.line
         }
     }
@@ -1053,7 +1117,7 @@ function extractCallerInfo(stack: Array<{ function?: string, filepath?: string, 
     // Fallback to first frame if offset is out of bounds
     if (stack.length > 0) {
         return {
-            filepath: stack[0].filepath,
+            fileUri: stack[0].fileUri,
             line: stack[0].line
         }
     }

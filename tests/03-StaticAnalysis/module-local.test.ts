@@ -765,6 +765,52 @@ describe('Module-local function detection', () => {
         expect((capsule as any).cst.source.ambientReferences).not.toHaveProperty('Mapping')
     })
 
+    it('should detect module-local function that references module-local variables as self-contained', async () => {
+        const { encapsulate, CapsulePropertyTypes, makeImportStack } = await CapsuleSpineFactory({
+            spineFilesystemRoot: join(import.meta.dir, '../../../../..'),
+            spineContracts: {
+                ['#' + CapsuleSpineContract['#']]: CapsuleSpineContract
+            }
+        })
+
+        const PORTS = { mozilla: 33101, chrome: 33102 } as const
+
+        function resolvePorts(target?: string): number[] {
+            if (!target) return [PORTS.mozilla, PORTS.chrome]
+            return [PORTS[target as keyof typeof PORTS]]
+        }
+
+        const capsule = await encapsulate({
+            '#@stream44.studio/encapsulate/spine-contracts/CapsuleSpineContract.v0': {
+                '#': {
+                    broadcast: {
+                        type: CapsulePropertyTypes.Function,
+                        value: function (this: any, target?: string): number[] {
+                            return resolvePorts(target)
+                        }
+                    }
+                }
+            }
+        }, {
+            importMeta: import.meta,
+            importStack: makeImportStack(),
+            capsuleName: 'testCapsule'
+        })
+
+        // resolvePorts should be detected as module-local (self-contained)
+        // because it only references PORTS which is also a module-local variable
+        expect((capsule as any).cst.source.ambientReferences.resolvePorts).toBeDefined()
+        expect((capsule as any).cst.source.ambientReferences.resolvePorts.type).toBe('module-local')
+
+        // PORTS should also be captured as a module-local dependency
+        expect((capsule as any).cst.source.ambientReferences.PORTS).toBeDefined()
+        expect((capsule as any).cst.source.ambientReferences.PORTS.type).toBe('module-local')
+
+        // Both should appear in moduleLocalCode
+        expect((capsule as any).cst.source.moduleLocalCode).toHaveProperty('resolvePorts')
+        expect((capsule as any).cst.source.moduleLocalCode).toHaveProperty('PORTS')
+    })
+
     it('should preserve export keyword on exported module-local const in moduleLocalCode', async () => {
         const { encapsulate, CapsulePropertyTypes, makeImportStack } = await CapsuleSpineFactory({
             spineFilesystemRoot: join(import.meta.dir, '../../../../..'),

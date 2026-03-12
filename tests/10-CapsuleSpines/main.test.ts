@@ -234,7 +234,7 @@ describe('CapsuleSpine Linking Features', () => {
                 }
             } else {
                 // Caller is stack-inferred (e.g., framework init calls)
-                expect(event.caller.filepath).toBeDefined()
+                expect(event.caller.fileUri).toBeDefined()
             }
         }
 

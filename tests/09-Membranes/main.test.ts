@@ -231,10 +231,10 @@ it('Membrane construction & execution', async function () {
     const nonResultEvents = membraneEvents.filter((e: any) => e.event !== 'call-result')
     for (const event of nonResultEvents) {
         expect(event.caller).toBeDefined()
-        // caller must have either capsuleSourceLineRef (from capsule context) or filepath (from stack inference)
+        // caller must have either capsuleSourceLineRef (from capsule context) or fileUri (from stack inference)
         const hasCapsuleRef = event.caller.capsuleSourceLineRef !== undefined
-        const hasFilepath = event.caller.filepath !== undefined
-        expect(hasCapsuleRef || hasFilepath).toBe(true)
+        const hasFileUri = event.caller.fileUri !== undefined
+        expect(hasCapsuleRef || hasFileUri).toBe(true)
     }
 
     // Internal events should have capsule-level caller context (from the function that accessed the property)
@@ -829,8 +829,8 @@ describe('Caller info', () => {
         for (const event of nonResultEvents) {
             expect(event.caller).toBeDefined()
             const hasCapsuleRef = event.caller.capsuleSourceLineRef !== undefined
-            const hasFilepath = event.caller.filepath !== undefined
-            expect(hasCapsuleRef || hasFilepath).toBe(true)
+            const hasFileUri = event.caller.fileUri !== undefined
+            expect(hasCapsuleRef || hasFileUri).toBe(true)
         }
 
         // Specifically: internal events have capsule-level caller with prop
@@ -903,8 +903,8 @@ describe('Caller info', () => {
             for (const event of nonResultEvents) {
                 expect(event.caller).toBeDefined()
                 const hasCapsuleRef = event.caller.capsuleSourceLineRef !== undefined
-                const hasFilepath = event.caller.filepath !== undefined
-                expect(hasCapsuleRef || hasFilepath).toBe(true)
+                const hasFileUri = event.caller.fileUri !== undefined
+                expect(hasCapsuleRef || hasFileUri).toBe(true)
             }
         }
 

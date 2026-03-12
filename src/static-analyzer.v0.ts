@@ -1006,7 +1006,7 @@ function extractModuleLocalCode(
         if (funcDecl) {
             // Analyze the function to see if it's self-contained
             const dependencies = new Set<string>()
-            const isContained = analyzeFunctionDependencies(funcDecl, sourceFile, importMap, assignmentMap, moduleLocalFunctions, dependencies)
+            const isContained = analyzeFunctionDependencies(funcDecl, sourceFile, importMap, assignmentMap, moduleLocalFunctions, dependencies, moduleLocalVariables)
 
             if (isContained) {
                 // Mark this as module-local in ambient references
@@ -1034,9 +1034,33 @@ function extractModuleLocalCode(
                 // Collect the main function
                 collectFunction(name)
 
-                // Collect all dependencies
+                // Collect all dependencies (functions and variables)
                 for (const dep of dependencies) {
                     collectFunction(dep)
+
+                    // Also collect module-local variable dependencies
+                    const depVarDecl = moduleLocalVariables.get(dep)
+                    if (depVarDecl && !processed.has(dep)) {
+                        processed.add(dep)
+                        const varStatement = depVarDecl.parent?.parent
+                        if (varStatement && ts.isVariableStatement(varStatement)) {
+                            const varCode = varStatement.getText(sourceFile)
+                            collectedCode.push(varCode)
+                            if (!moduleLocalCode[dep]) {
+                                moduleLocalCode[dep] = varCode
+                            }
+                        }
+                        // Mark the variable dependency in ambient references
+                        if (!ambientReferences[dep]) {
+                            ambientReferences[dep] = { type: 'module-local' }
+                        }
+                        // Recursively collect transitive variable dependencies
+                        collectTransitiveVariableDependencies(
+                            depVarDecl, sourceFile, importMap, assignmentMap,
+                            moduleLocalFunctions, moduleLocalVariables,
+                            ambientReferences, moduleLocalCode
+                        )
+                    }
                 }
 
                 // Store the collected code (main function with all dependencies)
@@ -1087,7 +1111,7 @@ function extractModuleLocalCode(
 
         // Analyze if it's self-contained
         const dependencies = new Set<string>()
-        const isContained = analyzeFunctionDependencies(funcDecl, sourceFile, importMap, assignmentMap, moduleLocalFunctions, dependencies)
+        const isContained = analyzeFunctionDependencies(funcDecl, sourceFile, importMap, assignmentMap, moduleLocalFunctions, dependencies, moduleLocalVariables)
 
         if (isContained) {
             // Add this function to moduleLocalCode
@@ -1214,14 +1238,15 @@ function collectTransitiveVariableDependencies(
     visit(varDecl.initializer)
 }
 
-// Analyze if a function is self-contained (only depends on other module-local functions or builtins)
+// Analyze if a function is self-contained (only depends on other module-local functions, variables, or builtins)
 function analyzeFunctionDependencies(
     funcDecl: ts.FunctionDeclaration,
     sourceFile: ts.SourceFile,
     importMap: Map<string, { importSpecifier: string, moduleUri: string }>,
     assignmentMap: Map<string, { importSpecifier: string, moduleUri: string }>,
     moduleLocalFunctions: Map<string, ts.FunctionDeclaration>,
-    dependencies: Set<string>
+    dependencies: Set<string>,
+    moduleLocalVariables?: Map<string, ts.VariableDeclaration>
 ): boolean {
     const localIdentifiers = new Set<string>()
     const nestedFunctionScopes = new Map<ts.Node, Set<string>>()
@@ -1344,6 +1369,12 @@ function analyzeFunctionDependencies(
 
             // Check if it's a module-local function - add as dependency
             if (moduleLocalFunctions.has(identifierName)) {
+                dependencies.add(identifierName)
+                return
+            }
+
+            // Check if it's a module-local variable - add as dependency
+            if (moduleLocalVariables?.has(identifierName)) {
                 dependencies.add(identifierName)
                 return
             }
@@ -1681,7 +1712,7 @@ function extractCapsuleAmbientReferences(
                     if (funcDecl) {
                         // Analyze if it's self-contained
                         const dependencies = new Set<string>()
-                        const isContained = analyzeFunctionDependencies(funcDecl, sourceFile, importMap, assignmentMap, moduleLocalFunctions, dependencies)
+                        const isContained = analyzeFunctionDependencies(funcDecl, sourceFile, importMap, assignmentMap, moduleLocalFunctions, dependencies, moduleLocalVariables)
 
                         if (isContained) {
                             // Mark as module-local
@@ -1689,7 +1720,7 @@ function extractCapsuleAmbientReferences(
                                 type: 'module-local'
                             }
 
-                            // Add import dependencies from the function's body
+                            // Add import/variable dependencies from the function's body
                             for (const depName of dependencies) {
                                 if (!ambientRefs[depName]) {
                                     const depImportInfo = importMap.get(depName)
@@ -1706,6 +1737,14 @@ function extractCapsuleAmbientReferences(
                                                 type: 'assigned',
                                                 importSpecifier: depAssignmentInfo.importSpecifier,
                                                 moduleUri: depAssignmentInfo.moduleUri
+                                            }
+                                        } else if (moduleLocalVariables.has(depName)) {
+                                            ambientRefs[depName] = {
+                                                type: 'module-local'
+                                            }
+                                        } else if (moduleLocalFunctions.has(depName)) {
+                                            ambientRefs[depName] = {
+                                                type: 'module-local'
                                             }
                                         }
                                     }
@@ -2053,7 +2092,7 @@ function extractAndValidateAmbientReferences(
                     if (funcDecl) {
                         // Analyze if it's self-contained
                         const dependencies = new Set<string>()
-                        const isContained = analyzeFunctionDependencies(funcDecl, sourceFile, importMap, assignmentMap, moduleLocalFunctions, dependencies)
+                        const isContained = analyzeFunctionDependencies(funcDecl, sourceFile, importMap, assignmentMap, moduleLocalFunctions, dependencies, moduleLocalVariables)
 
                         if (isContained) {
                             // Mark as module-local
@@ -2061,7 +2100,7 @@ function extractAndValidateAmbientReferences(
                                 type: 'module-local'
                             }
 
-                            // Add import dependencies from the function's body
+                            // Add import/variable dependencies from the function's body
                             for (const depName of dependencies) {
                                 if (!ambientRefs[depName]) {
                                     const depImportInfo = importMap.get(depName)
@@ -2078,6 +2117,14 @@ function extractAndValidateAmbientReferences(
                                                 type: 'assigned',
                                                 importSpecifier: depAssignmentInfo.importSpecifier,
                                                 moduleUri: depAssignmentInfo.moduleUri
+                                            }
+                                        } else if (moduleLocalVariables.has(depName)) {
+                                            ambientRefs[depName] = {
+                                                type: 'module-local'
+                                            }
+                                        } else if (moduleLocalFunctions.has(depName)) {
+                                            ambientRefs[depName] = {
+                                                type: 'module-local'
                                             }
                                         }
                                     }

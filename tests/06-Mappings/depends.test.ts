@@ -194,6 +194,84 @@ for (const { label, Contract } of [
             expect(result.moduleFilepath).toContain('depends.test')
         })
 
+        it('moduleFilepath in options({ self }) is stable across freeze/run and points to source file', async function () {
+
+            const spineRoot = join(import.meta.dir, '../../../../..')
+
+            const { encapsulate, freeze, CapsulePropertyTypes, makeImportStack, hoistSnapshot } = await CapsuleSpineFactory({
+                spineFilesystemRoot: spineRoot,
+                capsuleModuleProjectionRoot: import.meta.dir,
+                spineContracts: {
+                    ['#' + Contract['#']]: Contract
+                }
+            })
+
+            // A capsule that receives and exposes a config
+            const pathReceiver = await encapsulate({
+                '#@stream44.studio/encapsulate/spine-contracts/CapsuleSpineContract.v0': {
+                    '#@stream44.studio/encapsulate/structs/Capsule': {},
+                    '#': {
+                        config: {
+                            type: CapsulePropertyTypes.Literal,
+                            value: undefined,
+                        },
+                        getConfig: {
+                            type: CapsulePropertyTypes.Function,
+                            value: function (this: any) {
+                                return this.config
+                            }
+                        }
+                    }
+                }
+            }, {
+                importMeta: import.meta,
+                importStack: makeImportStack(),
+                capsuleName: 'pathReceiver',
+            })
+
+            // Main capsule uses options({ self }) to capture moduleFilepath
+            const pathCapture = await encapsulate({
+                '#@stream44.studio/encapsulate/spine-contracts/CapsuleSpineContract.v0': {
+                    '#@stream44.studio/encapsulate/structs/Capsule': {},
+                    '#': {
+                        receiver: {
+                            type: CapsulePropertyTypes.Mapping,
+                            value: pathReceiver,
+                            options: function ({ self }: any) {
+                                const capsuleStruct = self['#@stream44.studio/encapsulate/structs/Capsule']
+                                return {
+                                    '#': {
+                                        config: {
+                                            moduleFilepath: capsuleStruct.moduleFilepath,
+                                        }
+                                    }
+                                }
+                            },
+                        },
+                    }
+                }
+            }, {
+                importMeta: import.meta,
+                importStack: makeImportStack(),
+                capsuleName: 'pathCapture',
+                ambientReferences: { pathReceiver }
+            })
+
+            const { run } = await hoistSnapshot({
+                snapshot: await freeze()
+            })
+
+            const result = await run({}, async ({ apis }: any) => {
+                return apis[pathCapture.capsuleSourceLineRef].receiver.getConfig()
+            })
+
+            // The expected absolute path for this test file (with extension)
+            const expectedPath = join(spineRoot, 'encapsulate.dev/packages/encapsulate/tests/06-Mappings/depends.test.ts')
+
+            // moduleFilepath must always be the original source path, not a projected path
+            expect(result.moduleFilepath).toBe(expectedPath)
+        })
+
         it('Dynamic depends: static analyzer auto-detects self references in options() and injects depends', async function () {
 
             const { encapsulate, freeze, CapsulePropertyTypes, makeImportStack, hoistSnapshot } = await CapsuleSpineFactory({

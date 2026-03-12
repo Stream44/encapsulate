@@ -397,7 +397,7 @@ Both implement the same property mapping logic. The difference is observability.
 | `call` | Function invoked | `{ target, args, eventIndex }` |
 | `call-result` | Function returns | `{ target, result, callEventIndex }` |
 
-Events include `caller` context (source capsule, property, filepath, line) when `enableCallerStackInference` is enabled. Memoized results are tagged with `memoized: true`.
+Events include `caller` context (source capsule, property, fileUri, line) when `enableCallerStackInference` is enabled. Memoized results are tagged with `memoized: true`.
 
 ### SpineRuntime & run()
 

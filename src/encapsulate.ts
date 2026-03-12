@@ -731,12 +731,20 @@ async function encapsulate(definition: TCapsuleDefinition, options: TCapsuleOpti
                 const ownSelf = merge({}, defaultInstance, defaultPropertyValues, ...Object.values(mergedValuesByContract))
 
                 // Convert relative paths to absolute for metadata exposure
+                // When a CST exists with a source moduleFilepath, use it to derive the absolute path.
+                // This ensures that projected capsules (loaded from .~o/encapsulate.dev/caps/...)
+                // still expose the original source filepath, not the projected filepath.
+                const originalAbsoluteModuleFilepath = cst?.source?.moduleFilepath
+                    ? (cst.source.moduleFilepath.startsWith('/')
+                        ? cst.source.moduleFilepath
+                        : join(spine.spineOptions.spineFilesystemRoot || '', cst.source.moduleFilepath))
+                    : absoluteModuleFilepath
                 const absoluteCapsuleSourceLineRef = `${absoluteModuleFilepath}:${importStackLine}`
                 const capsuleMetadataStruct: Record<string, any> = {
                     capsuleName: encapsulateOptions.capsuleName,
                     capsuleSourceLineRef: absoluteCapsuleSourceLineRef,
                     capsuleSourceNameRefHash: cst?.capsuleSourceNameRefHash,
-                    moduleFilepath: absoluteModuleFilepath,
+                    moduleFilepath: originalAbsoluteModuleFilepath,
                     // Root capsule metadata will be populated after extends chain is resolved
                     rootCapsule: {
                         capsuleName: undefined as string | undefined,
@@ -854,7 +862,7 @@ async function encapsulate(definition: TCapsuleDefinition, options: TCapsuleOpti
                 const resolvedRootCapsule = rootCapsule || {
                     capsuleName: encapsulateOptions.capsuleName!,
                     capsuleSourceLineRef: absoluteCapsuleSourceLineRef,
-                    moduleFilepath: absoluteModuleFilepath
+                    moduleFilepath: originalAbsoluteModuleFilepath
                 }
                 capsuleMetadataStruct.rootCapsule.capsuleName = resolvedRootCapsule.capsuleName
                 capsuleMetadataStruct.rootCapsule.capsuleSourceLineRef = resolvedRootCapsule.capsuleSourceLineRef

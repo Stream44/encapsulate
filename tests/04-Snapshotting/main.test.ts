@@ -216,24 +216,24 @@ describe('Snapshot construction & execution with capsule projection', async func
             expect(capsule1Meta).toBeDefined()
             expect(capsule1Meta.capsuleName).toBe('capsule1')
             expect(capsule1Meta.capsuleSourceLineRef).toMatch(/\/tests\/04-Snapshotting\/main\.test:\d+$/)
-            expect(capsule1Meta.moduleFilepath).toMatch(/\/tests\/04-Snapshotting\/main\.test$/)
+            expect(capsule1Meta.moduleFilepath).toMatch(/\/tests\/04-Snapshotting\/main\.test\.ts$/)
             // capsule1 has no extends, so it is its own root
             // Note: paths may be relative when loaded from snapshot without spineFilesystemRoot
             expect(capsule1Meta.rootCapsule.capsuleName).toBe('capsule1')
             expect(capsule1Meta.rootCapsule.capsuleSourceLineRef).toMatch(/\/tests\/04-Snapshotting\/main\.test:\d+$/)
-            expect(capsule1Meta.rootCapsule.moduleFilepath).toMatch(/\/tests\/04-Snapshotting\/main\.test$/)
+            expect(capsule1Meta.rootCapsule.moduleFilepath).toMatch(/\/tests\/04-Snapshotting\/main\.test\.ts$/)
 
             // Assert capsule metadata for capsule2
             const capsule2Meta = apis['capsule2'].getCapsuleMeta()
             expect(capsule2Meta).toBeDefined()
             expect(capsule2Meta.capsuleName).toBe('capsule2')
             expect(capsule2Meta.capsuleSourceLineRef).toMatch(/\/tests\/04-Snapshotting\/main\.test:\d+$/)
-            expect(capsule2Meta.moduleFilepath).toMatch(/\/tests\/04-Snapshotting\/main\.test$/)
+            expect(capsule2Meta.moduleFilepath).toMatch(/\/tests\/04-Snapshotting\/main\.test\.ts$/)
             // capsule2 has no extends, so it is its own root
             // Note: paths may be relative when loaded from snapshot without spineFilesystemRoot
             expect(capsule2Meta.rootCapsule.capsuleName).toBe('capsule2')
             expect(capsule2Meta.rootCapsule.capsuleSourceLineRef).toMatch(/\/tests\/04-Snapshotting\/main\.test:\d+$/)
-            expect(capsule2Meta.rootCapsule.moduleFilepath).toMatch(/\/tests\/04-Snapshotting\/main\.test$/)
+            expect(capsule2Meta.rootCapsule.moduleFilepath).toMatch(/\/tests\/04-Snapshotting\/main\.test\.ts$/)
 
             // Assert that capsule2's mapped capsule (capsule1) has correct root metadata
             const mappedCapsuleMeta = apis['capsule2'].mappedCapsule.getCapsuleMeta()
@@ -243,7 +243,7 @@ describe('Snapshot construction & execution with capsule projection', async func
             // Note: paths may be relative when loaded from snapshot without spineFilesystemRoot
             expect(mappedCapsuleMeta.rootCapsule.capsuleName).toBe('capsule2')
             expect(mappedCapsuleMeta.rootCapsule.capsuleSourceLineRef).toMatch(/\/tests\/04-Snapshotting\/main\.test:\d+$/)
-            expect(mappedCapsuleMeta.rootCapsule.moduleFilepath).toMatch(/\/tests\/04-Snapshotting\/main\.test$/)
+            expect(mappedCapsuleMeta.rootCapsule.moduleFilepath).toMatch(/\/tests\/04-Snapshotting\/main\.test\.ts$/)
 
             // Run Capsule DAG on Spine
             return Promise.all([
