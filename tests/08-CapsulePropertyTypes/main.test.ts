@@ -727,6 +727,120 @@ for (const { label, Contract } of [
         })
 
 
+        it('OnFreeze fires during freeze() for capsules and mapped capsules', async function () {
+
+            const onFreezeCalls: string[] = []
+
+            const { encapsulate, freeze, CapsulePropertyTypes, makeImportStack } = await CapsuleSpineFactory({
+                spineFilesystemRoot: join(import.meta.dir, '../../../../..'),
+                capsuleModuleProjectionRoot: import.meta.dir,
+                enableCallerStackInference: true,
+                spineContracts: {
+                    ['#' + Contract['#']]: Contract
+                }
+            })
+
+            const leafCapsule = await encapsulate({
+                '#@stream44.studio/encapsulate/spine-contracts/CapsuleSpineContract.v0': {
+                    '#@stream44.studio/encapsulate/structs/Capsule': {},
+                    '#': {
+                        leafFreezeDone: {
+                            type: CapsulePropertyTypes.Literal,
+                            value: false
+                        },
+                        onFreezeHandler: {
+                            type: CapsulePropertyTypes.OnFreeze,
+                            value: function (this: any) {
+                                this.leafFreezeDone = true
+                                onFreezeCalls.push('leaf')
+                            }
+                        }
+                    }
+                }
+            }, {
+                importMeta: import.meta,
+                importStack: makeImportStack(),
+                capsuleName: 'onFreezeLeaf'
+            })
+
+            const rootCapsule = await encapsulate({
+                '#@stream44.studio/encapsulate/spine-contracts/CapsuleSpineContract.v0': {
+                    '#@stream44.studio/encapsulate/structs/Capsule': {},
+                    '#': {
+                        rootFreezeDone: {
+                            type: CapsulePropertyTypes.Literal,
+                            value: false
+                        },
+                        onFreezeHandler: {
+                            type: CapsulePropertyTypes.OnFreeze,
+                            value: function (this: any) {
+                                this.rootFreezeDone = true
+                                onFreezeCalls.push('root')
+                            }
+                        },
+                        mapped: {
+                            type: CapsulePropertyTypes.Mapping,
+                            value: leafCapsule
+                        }
+                    }
+                }
+            }, {
+                importMeta: import.meta,
+                importStack: makeImportStack(),
+                capsuleName: 'onFreezeRoot',
+                ambientReferences: { leafCapsule }
+            })
+
+            await freeze()
+
+            // Each OnFreeze should fire exactly once per capsule (no duplicates from capsuleName aliases)
+            expect(onFreezeCalls.sort()).toEqual(['leaf', 'root'])
+        })
+
+
+        it('OnFreeze property should NOT be on the API', async function () {
+
+            const { encapsulate, freeze, CapsulePropertyTypes, makeImportStack, hoistSnapshot } = await CapsuleSpineFactory({
+                spineFilesystemRoot: join(import.meta.dir, '../../../../..'),
+                capsuleModuleProjectionRoot: import.meta.dir,
+                enableCallerStackInference: true,
+                spineContracts: {
+                    ['#' + Contract['#']]: Contract
+                }
+            })
+
+            const capsule1 = await encapsulate({
+                '#@stream44.studio/encapsulate/spine-contracts/CapsuleSpineContract.v0': {
+                    '#@stream44.studio/encapsulate/structs/Capsule': {},
+                    '#': {
+                        name: {
+                            type: CapsulePropertyTypes.Literal,
+                            value: 'test'
+                        },
+                        onFreezeHandler: {
+                            type: CapsulePropertyTypes.OnFreeze,
+                            value: function (this: any) { }
+                        }
+                    }
+                }
+            }, {
+                importMeta: import.meta,
+                importStack: makeImportStack(),
+                capsuleName: 'onFreezeNotOnApi'
+            })
+
+            const { run } = await hoistSnapshot({
+                snapshot: await freeze()
+            })
+
+            await run({}, async ({ apis }) => {
+                const api = apis[capsule1.capsuleSourceLineRef]
+                expect('onFreezeHandler' in api).toBe(false)
+                expect(api.name).toBe('test')
+            })
+        })
+
+
         it('Literal Map property preserves Map methods', async function () {
 
             const { encapsulate, freeze, CapsulePropertyTypes, makeImportStack, hoistSnapshot } = await CapsuleSpineFactory({

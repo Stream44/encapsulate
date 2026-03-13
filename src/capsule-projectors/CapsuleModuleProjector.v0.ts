@@ -199,6 +199,9 @@ export function CapsuleModuleProjector({
                         for (const nestedPropName in propContract.properties) {
                             if (nestedPropName.startsWith('/')) {
                                 const nestedProp = propContract.properties[nestedPropName]
+                                // Skip if this mapping has a propertyContractDelegate — the delegate
+                                // handles its own projection via OnFreeze
+                                if (nestedProp.propertyContractDelegate) continue
                                 // Check if this is a Mapping type property
                                 if (nestedProp.type === 'CapsulePropertyTypes.Mapping') {
                                     // First try to find the mapped capsule in ambient references
@@ -287,23 +290,6 @@ export function CapsuleModuleProjector({
         return uris
     }
 
-    // Helper: Check if capsule has solidjs.com/standalone property
-    function hasSolidJsProperty(capsule: any, spineContractUri: string): boolean {
-        const spineContract = capsule.cst.spineContracts[spineContractUri]
-        // Check both top-level and nested under '#' property contract
-        const topLevelProps = spineContract?.propertyContracts || {}
-        const nestedProps = spineContract?.propertyContracts?.['#']?.properties || {}
-
-        // Check for solidjs.com/standalone specifically
-        for (const key of Object.keys(topLevelProps)) {
-            if (key === 'solidjs.com/standalone') return true
-        }
-        for (const key of Object.keys(nestedProps)) {
-            if (key === 'solidjs.com/standalone') return true
-        }
-        return false
-    }
-
     // Helper: Check if capsule has encapsulate.dev/standalone property (with optional suffix)
     function hasStandaloneProperty(capsule: any, spineContractUri: string): boolean {
         const spineContract = capsule.cst.spineContracts[spineContractUri]
@@ -319,66 +305,6 @@ export function CapsuleModuleProjector({
             if (key === 'encapsulate.dev/standalone' || key.startsWith('encapsulate.dev/standalone/')) return true
         }
         return false
-    }
-
-    // Helper: Extract SolidJS component function from capsule definition
-    function extractSolidJsComponent(capsule: any, spineContractUri: string): string | null {
-        const spineContract = capsule.cst.spineContracts[spineContractUri]
-
-        // Check nested under '#' property contract first, looking for solidjs.com/standalone
-        const nestedProps = spineContract?.propertyContracts?.['#']?.properties || {}
-        const topLevelProps = spineContract?.propertyContracts || {}
-
-        let solidjsProp = null
-        for (const key of Object.keys(nestedProps)) {
-            if (key === 'solidjs.com/standalone') {
-                solidjsProp = nestedProps[key]
-                break
-            }
-        }
-        if (!solidjsProp) {
-            for (const key of Object.keys(topLevelProps)) {
-                if (key === 'solidjs.com/standalone') {
-                    solidjsProp = topLevelProps[key]
-                    break
-                }
-            }
-        }
-
-        if (!solidjsProp || solidjsProp.type !== 'CapsulePropertyTypes.Function') {
-            return null
-        }
-
-        // Extract the value expression which contains the component function
-        const valueExpression = solidjsProp.valueExpression
-        if (!valueExpression) return null
-
-        // The value expression is: "function (this: any): Function {\n    return function ComponentName() { ... }\n}"
-        // We need to extract the inner function after "return "
-        // Use a more flexible regex that handles multiline and varying whitespace
-        const match = valueExpression.match(/return\s+(function\s+\w*\s*\([^)]*\)\s*\{[\s\S]*)\s*\}\s*$/m)
-        if (match) {
-            // Clean up the extracted function - remove extra indentation
-            let extracted = match[1].trim()
-            // Add back the closing brace if it was removed
-            if (!extracted.endsWith('}')) {
-                extracted += '\n}'
-            }
-            // Remove leading indentation from each line
-            const lines = extracted.split('\n')
-            const minIndent = lines
-                .filter(line => line.trim().length > 0)
-                .map(line => line.match(/^(\s*)/)?.[1].length || 0)
-                .reduce((min, indent) => Math.min(min, indent), Infinity)
-
-            if (minIndent > 0 && minIndent !== Infinity) {
-                extracted = lines.map(line => line.substring(minIndent)).join('\n')
-            }
-
-            return extracted
-        }
-
-        return null
     }
 
     // Helper: Extract standalone function from capsule definition
@@ -812,196 +738,15 @@ export function CapsuleModuleProjector({
 
         const allStatements = [importStatements, literalReferences, moduleLocalFunctions].filter(Boolean).join('\n')
 
-        // Check if this capsule has a solidjs.com or standalone property
-        const hasSolidJs = hasSolidJsProperty(capsule, spineContractUri)
+        // Check if this capsule has an encapsulate.dev/standalone property
         const hasStandalone = hasStandaloneProperty(capsule, spineContractUri)
-        const needsRuntime = hasSolidJs || hasStandalone
 
-        // Determine which solid-js imports are needed (avoid duplicates with ambient references)
-        const existingSolidJsImports = new Set<string>()
-        for (const [name, ref] of Object.entries(ambientReferences)) {
-            const refTyped = ref as any
-            if (refTyped.type === 'import' && refTyped.moduleUri === 'solid-js') {
-                // Parse existing imports from solid-js
-                const match = refTyped.importSpecifier?.match(/\{([^}]+)\}/)
-                if (match) {
-                    match[1].split(',').forEach((imp: string) => existingSolidJsImports.add(imp.trim()))
-                }
-            }
-        }
-
-        const neededSolidJsImports = ['createSignal', 'onMount', 'Show'].filter(imp => !existingSolidJsImports.has(imp))
-        const solidJsImport = hasSolidJs && neededSolidJsImports.length > 0 ? `import { ${neededSolidJsImports.join(', ')} } from 'solid-js'\n` : ''
-
-        // Add runtime imports for SolidJS and standalone functions
-        const runtimeImport = needsRuntime ? `"use client"\nimport { Spine, SpineRuntime } from '@stream44.studio/encapsulate/encapsulate'\nimport { CapsuleSpineContract } from '@stream44.studio/encapsulate/spine-contracts/CapsuleSpineContract.v0/Membrane.v0'\n${solidJsImport}` : ''
+        // Add runtime imports for standalone functions
+        const runtimeImport = hasStandalone ? `"use client"\nimport { Spine, SpineRuntime } from '@stream44.studio/encapsulate/encapsulate'\nimport { CapsuleSpineContract } from '@stream44.studio/encapsulate/spine-contracts/CapsuleSpineContract.v0/Membrane.v0'\n` : ''
 
         // Generate default export based on capsule type
         let defaultExport = ''
-        if (hasSolidJs) {
-            // Generate a wrapper that sets up runtime and exports the SolidJS component
-            const capsuleSourceLineRef = capsule.cst.capsuleSourceLineRef
-            const solidjsComponent = extractSolidJsComponent(capsule, spineContractUri)
-            if (solidjsComponent) {
-                // Collect all capsule URIs from CST (mappings and property contracts)
-                const allCapsuleUris = collectAllCapsuleUris(capsule, spineContractUri)
-
-                // Also collect from ambient references and build import paths from snapshots
-                const capsuleDeps: Array<{ uri: string, importName: string, importPath: string }> = []
-                for (const [name, ref] of Object.entries(ambientReferences)) {
-                    const refTyped = ref as any
-                    if (refTyped.type === 'capsule') {
-                        const snapshot = await buildCapsuleSnapshotForReference(refTyped, capsules, spineContractUri)
-
-                        // Use dynamic spineContractUri instead of hardcoded URI
-                        const contractData = snapshot.spineContracts?.[spineContractUri]
-                        const structKey = Object.keys(contractData || {}).find(k => k.includes('/structs/Capsule'))
-                        const capsuleName = structKey ? contractData[structKey]?.capsuleName : undefined
-                        const projectedFilepath = structKey ? contractData[structKey]?.projectedCapsuleFilepath : undefined
-
-                        if (capsuleName && projectedFilepath) {
-                            allCapsuleUris.add(capsuleName)
-
-                            // Build import path from projected filepath
-                            const importName = `_capsule_${capsuleName.replace(/[^a-zA-Z0-9]/g, '_')}`
-                            // Remove .~o/encapsulate.dev/caps/ prefix and strip extension
-                            const importPath = projectedFilepath.replace(/^\.~o\/encapsulate\.dev\/caps\//, '').replace(/\.(ts|tsx)$/, '')
-
-                            capsuleDeps.push({ uri: capsuleName, importName, importPath })
-                        }
-                    }
-                }
-
-                // Generate static imports for all capsule dependencies
-                // Compute relative path from projected file to caps directory
-                let importPrefix: string
-                if (capsuleModuleProjectionPackage) {
-                    importPrefix = capsuleModuleProjectionPackage
-                } else {
-                    const projectedFileDir = dirname(filepath)
-                    const capsDir = '.~o/encapsulate.dev/caps'
-                    const relativePathToCaps = relative(projectedFileDir, capsDir)
-                    importPrefix = relativePathToCaps.startsWith('.') ? relativePathToCaps : './' + relativePathToCaps
-                }
-                const capsuleImports = capsuleDeps.map(dep =>
-                    `import * as ${dep.importName} from '${importPrefix}/${dep.importPath}'`
-                ).join('\n')
-
-                // Generate capsules map
-                const capsulesMapEntries = capsuleDeps.map(dep =>
-                    `    '${dep.uri}': ${dep.importName}`
-                ).join(',\n')
-
-                defaultExport = `
-${capsuleImports}
-
-// Set up runtime for browser execution
-const sourceSpine: { encapsulate?: any } = {}
-
-// Map of statically imported capsules
-const capsulesMap: Record<string, any> = {
-${capsulesMapEntries}
-}
-
-// Helper to import and instantiate a capsule from the capsules map
-const importCapsule = async (uri: string) => {
-    const capsuleModule = capsulesMap[uri]
-    if (!capsuleModule) {
-        throw new Error(\`Capsule not found in static imports: \${uri}\`)
-    }
-    const capsule = await capsuleModule.capsule({
-        encapsulate: sourceSpine.encapsulate,
-        loadCapsule
-    })
-    return capsule
-}
-
-const loadCapsule = async ({ capsuleSourceLineRef, capsuleName }: any) => {
-    // Return the capsule function from this projected file
-    if (capsuleSourceLineRef === '${capsuleSourceLineRef}') {
-        return capsule
-    }
-    
-    // Use capsuleName directly if provided
-    if (capsuleName) {
-        return await importCapsule(capsuleName)
-    }
-    
-    throw new Error(\`Cannot load capsule: \${capsuleSourceLineRef}\`)
-}
-
-const spineContractOpts = {
-    spineFilesystemRoot: '.',
-    resolve: async (uri: string) => uri,
-    importCapsule
-}
-
-const runtimeSpineContracts = {
-    ['#' + CapsuleSpineContract['#']]: CapsuleSpineContract(spineContractOpts)
-}
-
-const snapshot = {
-    capsules: {
-        ['${capsuleSourceLineRef}']: {
-            spineContracts: {}
-        }
-    }
-}
-
-// Export wrapper function that initializes runtime and returns component
-export default function({ onMembraneEvent }: { onMembraneEvent?: (event: any) => void } = {}) {
-    const [component, setComponent] = createSignal(null)
-    
-    onMount(async () => {
-        // Add onMembraneEvent to spine contract opts - use provided or default logger
-        const defaultMembraneLogger = (event: any) => {
-            console.log('[Membrane Event]', event)
-        }
-        const opts = { 
-            ...spineContractOpts, 
-            onMembraneEvent: onMembraneEvent || defaultMembraneLogger 
-        }
-        const contracts = {
-            ['#' + CapsuleSpineContract['#']]: CapsuleSpineContract(opts)
-        }
-        
-        const { encapsulate, capsules } = await Spine({ 
-            spineFilesystemRoot: '.', 
-            spineContracts: contracts 
-        })
-        
-        sourceSpine.encapsulate = encapsulate
-        
-        const capsuleInstance = await capsule({ encapsulate, loadCapsule })
-        
-        const { run } = await SpineRuntime({ 
-            spineFilesystemRoot: '.', 
-            spineContracts: contracts,
-            snapshot,
-            loadCapsule
-        })
-        
-        const Component = await run({}, async ({ apis }) => {
-            const capsuleApi = apis['${capsuleSourceLineRef}']
-            const solidjsKey = Object.keys(capsuleApi).find(k => k === 'solidjs.com/standalone')
-            if (!solidjsKey) throw new Error('solidjs.com/standalone property not found')
-            return capsuleApi[solidjsKey]()
-        })
-        
-        setComponent(() => Component)
-    })
-    
-    // Return the wrapper function itself, not call it
-    const WrapperComponent = () => {
-        const Component = component()
-        return Show({ when: Component, children: (Component) => Component() })
-    }
-    
-    return WrapperComponent
-}
-`
-            }
-        } else if (hasStandalone) {
+        if (hasStandalone) {
             // Generate a wrapper function that directly invokes the standalone function
             const capsuleSourceLineRef = capsule.cst.capsuleSourceLineRef
 
@@ -1095,6 +840,7 @@ ${capsulesMapEntries}
         }
         const capsule = await capsuleModule.capsule({
             encapsulate: sourceSpine.encapsulate,
+            CapsulePropertyTypes,
             loadCapsule
         })
         return capsule
@@ -1255,8 +1001,12 @@ ${defaultExport}
                 mappedCapsule.cst.source.moduleFilepath
             )
 
-            // Get ambient references for the mapped capsule
-            const mappedAmbientRefs = mappedCapsule.cst.source?.ambientReferences || {}
+            // Get ambient references for the mapped capsule, excluding makeImportStack
+            let mappedAmbientRefs = mappedCapsule.cst.source?.ambientReferences || {}
+            if (mappedAmbientRefs['makeImportStack']) {
+                mappedAmbientRefs = { ...mappedAmbientRefs }
+                delete mappedAmbientRefs['makeImportStack']
+            }
 
             // Generate import statements with projection CSS paths
             const mappedImportStatements = Object.entries(mappedAmbientRefs)
@@ -1315,191 +1065,17 @@ ${defaultExport}
 
             const mappedAllStatements = [mappedImportStatements, mappedLiteralReferences, mappedModuleLocalFunctions].filter(Boolean).join('\n')
 
-            // Check if mapped capsule has solidjs.com or encapsulate.dev/standalone property
-            const mappedHasSolidJs = hasSolidJsProperty(mappedCapsule, spineContractUri)
+            // Check if mapped capsule has encapsulate.dev/standalone property
             const mappedHasStandalone = hasStandaloneProperty(mappedCapsule, spineContractUri)
-            const mappedNeedsRuntime = mappedHasSolidJs || mappedHasStandalone
-
-            // Determine which solid-js imports are needed for mapped capsule
-            const mappedExistingSolidJsImports = new Set<string>()
-            for (const [name, ref] of Object.entries(mappedAmbientRefs)) {
-                const refTyped = ref as any
-                if (refTyped.type === 'import' && refTyped.moduleUri === 'solid-js') {
-                    const match = refTyped.importSpecifier?.match(/\{([^}]+)\}/)
-                    if (match) {
-                        match[1].split(',').forEach((imp: string) => mappedExistingSolidJsImports.add(imp.trim()))
-                    }
-                }
-            }
-
-            const mappedNeededSolidJsImports = ['createSignal', 'onMount', 'Show'].filter(imp => !mappedExistingSolidJsImports.has(imp))
-            const mappedSolidJsImport = mappedHasSolidJs && mappedNeededSolidJsImports.length > 0 ? `import { ${mappedNeededSolidJsImports.join(', ')} } from 'solid-js'\n` : ''
 
             // Rewrite the mapped capsule expression to include CST (reuse the same function)
             const mappedCapsuleExpression = rewriteCapsuleExpressionWithCST(mappedCapsule)
 
-            // Add runtime imports for SolidJS and standalone functions
-            const mappedRuntimeImport = mappedNeedsRuntime ? `"use client"\nimport { Spine, SpineRuntime } from '@stream44.studio/encapsulate/encapsulate'\nimport { CapsuleSpineContract } from '@stream44.studio/encapsulate/spine-contracts/CapsuleSpineContract.v0/Membrane.v0'\n${mappedSolidJsImport}` : ''
+            // Add runtime imports for standalone functions
+            const mappedRuntimeImport = mappedHasStandalone ? `"use client"\nimport { Spine, SpineRuntime } from '@stream44.studio/encapsulate/encapsulate'\nimport { CapsuleSpineContract } from '@stream44.studio/encapsulate/spine-contracts/CapsuleSpineContract.v0/Membrane.v0'\n` : ''
 
             let mappedDefaultExport = ''
-            if (mappedHasSolidJs) {
-                // Generate a wrapper that sets up runtime and exports the SolidJS component
-                const mappedCapsuleSourceLineRef = mappedCapsule.cst.capsuleSourceLineRef
-                const solidjsComponent = extractSolidJsComponent(mappedCapsule, spineContractUri)
-                if (solidjsComponent) {
-                    // Collect all capsule URIs from CST (mappings and property contracts)
-                    const allMappedCapsuleUris = collectAllCapsuleUris(mappedCapsule, spineContractUri)
-
-                    // Also collect from ambient references
-                    for (const [name, ref] of Object.entries(mappedAmbientRefs)) {
-                        const refTyped = ref as any
-                        if (refTyped.type === 'capsule') {
-                            const snapshot = await buildCapsuleSnapshotForReference(refTyped, capsules, spineContractUri)
-                            const contractData = snapshot.spineContracts?.[spineContractUri]
-                            const structKey = Object.keys(contractData || {}).find(k => k.includes('/structs/Capsule'))
-                            const capsuleName = structKey ? contractData[structKey]?.capsuleName : undefined
-                            if (capsuleName) {
-                                allMappedCapsuleUris.add(capsuleName)
-                            }
-                        }
-                    }
-
-                    // Build capsule dependencies array
-                    const mappedCapsuleDeps: Array<{ uri: string, importName: string, importPath: string }> = []
-                    for (const uri of allMappedCapsuleUris) {
-                        const importName = `_capsule_${uri.replace(/[^a-zA-Z0-9]/g, '_')}`
-                        // Strip leading @ to match caps filesystem paths
-                        const importPath = uri.startsWith('@') ? uri.substring(1) : uri
-                        mappedCapsuleDeps.push({ uri, importName, importPath })
-                    }
-
-                    // Generate static imports for all capsule dependencies
-                    // Compute relative path from projected file to caps directory
-                    let importPrefix: string
-                    if (capsuleModuleProjectionPackage) {
-                        importPrefix = capsuleModuleProjectionPackage
-                    } else {
-                        const projectedFileDir = dirname(mapped.projectionPath)
-                        const capsDir = '.~o/encapsulate.dev/caps'
-                        const relativePathToCaps = relative(projectedFileDir, capsDir)
-                        importPrefix = relativePathToCaps.startsWith('.') ? relativePathToCaps : './' + relativePathToCaps
-                    }
-                    const mappedCapsuleImports = mappedCapsuleDeps.map(dep =>
-                        `import * as ${dep.importName} from '${importPrefix}/${dep.importPath}'`
-                    ).join('\n')
-
-                    // Generate capsules map
-                    const mappedCapsulesMapEntries = mappedCapsuleDeps.map(dep =>
-                        `    '${dep.uri}': ${dep.importName}`
-                    ).join(',\n')
-
-                    mappedDefaultExport = `
-${mappedCapsuleImports}
-
-// Set up runtime for browser execution
-const sourceSpine: { encapsulate?: any } = {}
-
-// Map of statically imported capsules
-const capsulesMap: Record<string, any> = {
-${mappedCapsulesMapEntries}
-}
-
-// Helper to import and instantiate a capsule from the capsules map
-const importCapsule = async (uri: string) => {
-    const capsuleModule = capsulesMap[uri]
-    if (!capsuleModule) {
-        throw new Error(\`Capsule not found in static imports: \${uri}\`)
-    }
-    const capsule = await capsuleModule.capsule({
-        encapsulate: sourceSpine.encapsulate,
-        loadCapsule
-    })
-    return capsule
-}
-
-const loadCapsule = async ({ capsuleSourceLineRef, capsuleName }: any) => {
-    // Return the capsule function from this projected file
-    if (capsuleSourceLineRef === '${mappedCapsuleSourceLineRef}') {
-        return capsule
-    }
-    
-    // Use capsuleName directly if provided
-    if (capsuleName) {
-        return await importCapsule(capsuleName)
-    }
-    
-    throw new Error(\`Cannot load capsule: \${capsuleSourceLineRef}\`)
-}
-
-const spineContractOpts = {
-    spineFilesystemRoot: '.',
-    resolve: async (uri: string) => uri,
-    importCapsule
-}
-
-const runtimeSpineContracts = {
-    ['#' + CapsuleSpineContract['#']]: CapsuleSpineContract(spineContractOpts)
-}
-
-const snapshot = {
-    capsules: {
-        ['${mappedCapsuleSourceLineRef}']: {
-            spineContracts: {}
-        }
-    }
-}
-
-// Export wrapper function that initializes runtime and returns component
-export default function({ onMembraneEvent }: { onMembraneEvent?: (event: any) => void } = {}) {
-    const [component, setComponent] = createSignal(null)
-    
-    onMount(async () => {
-        // Add onMembraneEvent to spine contract opts - use provided or default logger
-        const defaultMembraneLogger = (event: any) => {
-            console.log('[Membrane Event]', event.type, event)
-        }
-        const opts = { 
-            ...spineContractOpts, 
-            onMembraneEvent: onMembraneEvent || defaultMembraneLogger 
-        }
-        const contracts = {
-            ['#' + CapsuleSpineContract['#']]: CapsuleSpineContract(opts)
-        }
-        
-        const { encapsulate, capsules } = await Spine({ 
-            spineFilesystemRoot: '.', 
-            spineContracts: contracts 
-        })
-        
-        sourceSpine.encapsulate = encapsulate
-        
-        const capsuleInstance = await capsule({ encapsulate, loadCapsule })
-        
-        const { run } = await SpineRuntime({ 
-            spineFilesystemRoot: '.', 
-            spineContracts: contracts,
-            snapshot,
-            loadCapsule
-        })
-        
-        const Component = await run({}, async ({ apis }) => {
-            const capsuleApi = apis['${mappedCapsuleSourceLineRef}']
-            const solidjsKey = Object.keys(capsuleApi).find(k => k === 'solidjs.com/standalone')
-            if (!solidjsKey) throw new Error('solidjs.com/standalone property not found')
-            return capsuleApi[solidjsKey]()
-        })
-        
-        setComponent(() => Component)
-    })
-    
-    return () => {
-        const Component = component()
-        return Show({ when: Component, children: (Component) => Component() })
-    }
-}
-`
-                }
-            } else if (mappedHasStandalone) {
+            if (mappedHasStandalone) {
                 // Generate a wrapper function that directly invokes the standalone function
                 const mappedCapsuleSourceLineRef = mappedCapsule.cst.capsuleSourceLineRef
 
@@ -1570,6 +1146,7 @@ ${mappedCapsulesMapEntries}
         }
         const capsule = await capsuleModule.capsule({
             encapsulate: sourceSpine.encapsulate,
+            CapsulePropertyTypes,
             loadCapsule
         })
         return capsule
@@ -1726,10 +1303,38 @@ ${mappedDefaultExport}
                         .filter(Boolean)
                         .join('\n    ')
 
-                    // Add necessary imports
-                    const imports = `import { CapsulePropertyTypes } from '@stream44.studio/encapsulate/encapsulate'
-import { makeImportStack } from '@stream44.studio/encapsulate/encapsulate'
-`
+                    // Filter out makeImportStack from ambient references (same as main capsule path)
+                    let filteredCapsuleAmbientRefs = capsuleAmbientRefs
+                    if (filteredCapsuleAmbientRefs['makeImportStack']) {
+                        filteredCapsuleAmbientRefs = { ...filteredCapsuleAmbientRefs }
+                        delete filteredCapsuleAmbientRefs['makeImportStack']
+                    }
+
+                    // Generate imports from filtered ambient references
+                    const capsuleImportStatements = Object.entries(filteredCapsuleAmbientRefs)
+                        .map(([name, ref]: [string, any]) => {
+                            if (ref.type === 'import') {
+                                if (ref.moduleUri.endsWith('.css')) {
+                                    return `import '${ref.moduleUri}'`
+                                }
+                                return `import ${ref.importSpecifier} from '${ref.moduleUri}'`
+                            }
+                            if (ref.type === 'assigned') {
+                                if (ref.moduleUri.includes('/spine-factories/')) {
+                                    return `import { ${name} } from '@stream44.studio/encapsulate/encapsulate'`
+                                }
+                            }
+                            if (ref.type === 'invocation-argument') {
+                                if (ref.isEncapsulateExport) {
+                                    return `import { ${name} } from '@stream44.studio/encapsulate/encapsulate'`
+                                }
+                            }
+                            return ''
+                        })
+                        .filter(Boolean)
+                        .join('\n')
+
+                    const imports = capsuleImportStatements ? capsuleImportStatements + '\n' : ''
 
                     // Get the capsule name for the assignment
                     const capsuleName = registryCapsule.cst.source.capsuleName || ''

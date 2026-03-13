@@ -1,4 +1,4 @@
-import { join, dirname, resolve as pathResolve } from 'path'
+import { join, dirname, relative, resolve as pathResolve } from 'path'
 import { writeFile, mkdir, readFile, stat } from 'fs/promises'
 import { Spine, SpineRuntime, CapsulePropertyTypes, makeImportStack, merge } from "../encapsulate"
 import { StaticAnalyzer } from "../../src/static-analyzer.v0"
@@ -278,6 +278,65 @@ async function resolve(uri: string, fromPath: string, spineRoot?: string): Promi
 }
 
 
+// Build an async npmUriForFilepath resolver backed by a directory→package-name cache.
+// Walks up the directory tree from a given filepath to find the nearest package.json
+// and constructs an npm-style URI (e.g. "package-name/src/foo.ts").
+function createNpmUriForFilepath(): (filepath: string) => Promise<string | null> {
+    const cache = new Map<string, string | null>()
+
+    return async (absoluteFilepath: string): Promise<string | null> => {
+        // Only process absolute paths — skip V8 internal markers like "native", "node:*", etc.
+        if (!absoluteFilepath.startsWith('/')) {
+            return null
+        }
+
+        // Check for /node_modules/ in the path — use the last occurrence to handle nested node_modules
+        const nodeModulesMarker = '/node_modules/'
+        const lastIdx = absoluteFilepath.lastIndexOf(nodeModulesMarker)
+        if (lastIdx !== -1) {
+            return absoluteFilepath.substring(lastIdx + nodeModulesMarker.length)
+        }
+
+        let currentDir = dirname(absoluteFilepath)
+        const maxDepth = 20
+
+        for (let i = 0; i < maxDepth; i++) {
+            if (cache.has(currentDir)) {
+                const cachedName = cache.get(currentDir)
+                if (cachedName) {
+                    const relativeFromPackage = relative(currentDir, absoluteFilepath)
+                    return `${cachedName}/${relativeFromPackage}`
+                }
+                // null means no package.json with name found at this level, continue up
+                const parentDir = dirname(currentDir)
+                if (parentDir === currentDir) break
+                currentDir = parentDir
+                continue
+            }
+
+            const packageJsonPath = join(currentDir, 'package.json')
+            try {
+                await stat(packageJsonPath)
+                const packageJson = JSON.parse(await readFile(packageJsonPath, 'utf-8'))
+                const packageName = packageJson.name
+                cache.set(currentDir, packageName || null)
+                if (packageName) {
+                    const relativeFromPackage = relative(currentDir, absoluteFilepath)
+                    return `${packageName}/${relativeFromPackage}`
+                }
+            } catch {
+                cache.set(currentDir, null)
+            }
+
+            const parentDir = dirname(currentDir)
+            if (parentDir === currentDir) break
+            currentDir = parentDir
+        }
+
+        return null
+    }
+}
+
 export async function CapsuleSpineFactory({
     spineFilesystemRoot,
     capsuleModuleProjectionRoot,
@@ -329,8 +388,10 @@ export async function CapsuleSpineFactory({
     }
 
     const sourceSpine: { encapsulate?: any } = {}
+    const npmUriForFilepath = createNpmUriForFilepath()
     const commonSpineContractOpts = {
         spineFilesystemRoot,
+        npmUriForFilepath,
         resolve: async (uri: string, parentFilepath: string) => {
             // For relative paths, join with parent directory first
             if (/^\.\.?\//.test(uri)) {
@@ -537,7 +598,28 @@ export async function CapsuleSpineFactory({
                 },
             },
         }) : undefined,
-        spineContracts: spineContractInstances.encapsulation
+        spineContracts: spineContractInstances.encapsulation,
+        projectionContext: capsuleModuleProjectionRoot ? {
+            capsuleModuleProjectionPackage,
+            capsuleModuleProjectionRoot,
+            projectionStore: {
+                writeFile: async (filepath: string, content: string) => {
+                    filepath = join(capsuleModuleProjectionRoot, filepath)
+                    await mkdir(dirname(filepath), { recursive: true })
+                    await writeFile(filepath, content, 'utf-8')
+                },
+                getStats: async (filepath: string) => {
+                    filepath = join(capsuleModuleProjectionRoot, filepath)
+                    try {
+                        const stats = await stat(filepath)
+                        return { mtime: stats.mtime }
+                    } catch (error) {
+                        return null
+                    }
+                },
+            },
+            get capsules() { return capsules }
+        } : undefined
     })
     sourceSpine.encapsulate = encapsulate
 

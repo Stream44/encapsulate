@@ -25,7 +25,7 @@ it('Handle circular dependencies during freeze phase', async function () {
     const snapshot = await freeze()
 
     console.log('Freeze complete!')
-    console.log('Snapshot:', JSON.stringify(snapshot, null, 2))
+    // console.log('Snapshot:', JSON.stringify(snapshot, null, 2))
 
     expect(snapshot).toBeDefined()
     expect(snapshot.capsules).toBeDefined()

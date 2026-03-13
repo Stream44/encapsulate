@@ -1,125 +1,96 @@
 import { describe, it, expect, beforeAll } from 'bun:test'
-import { SpineRuntime } from '../../src/encapsulate'
 import { CapsuleSpineContract } from '../../src/spine-contracts/CapsuleSpineContract.v0/Static.v0'
 import { CapsuleSpineFactory } from '../../src/spine-factories/CapsuleSpineFactory.v0'
-import { mkdir, rm } from 'fs/promises'
+import { rm } from 'fs/promises'
 import { join } from 'path'
 import { existsSync } from 'fs'
 
-describe.skip('Minimal Capsule Projection and Runtime', () => {
-    const testOutputDir = join(import.meta.dir, '.~projected')
-    const projectedFilePath = join(testOutputDir, 'standalone.ts')
+describe('Standalone Projector', () => {
+    const testDir = import.meta.dir
+    const projectedDir = join(testDir, '.~projected')
+    const component1Path = join(projectedDir, 'Component1.ts')
+    const component2Path = join(projectedDir, 'Component2.ts')
+
+    let snapshot: any
 
     beforeAll(async () => {
-        // Clean up test output directory
-        if (existsSync(testOutputDir)) {
-            await rm(testOutputDir, { recursive: true })
-        }
-        await mkdir(testOutputDir, { recursive: true })
-
-        // Ensure node_modules/@caps symlink exists
-        const nodeModulesDir = join(import.meta.dir, 'node_modules')
-        const capsSymlink = join(nodeModulesDir, '@caps')
-        const capsTarget = join(import.meta.dir, '.~o/encapsulate.dev/caps')
-
-        await mkdir(nodeModulesDir, { recursive: true })
-
-        // Remove existing symlink if it exists
-        try {
-            await rm(capsSymlink, { recursive: true, force: true })
-        } catch (e) {
-            // Ignore if doesn't exist
+        // Clean up projected output
+        if (existsSync(projectedDir)) {
+            await rm(projectedDir, { recursive: true })
         }
 
-        // Create symlink
-        const { symlink } = await import('fs/promises')
-        await symlink(capsTarget, capsSymlink, 'dir')
-    })
-
-    it('should project and run a capsule with encapsulate.dev/standalone property', async () => {
+        // Set up factory with projection enabled
         const { encapsulate, freeze, CapsulePropertyTypes, makeImportStack } = await CapsuleSpineFactory({
-            spineFilesystemRoot: import.meta.dir,
-            capsuleModuleProjectionRoot: import.meta.dir,
+            spineFilesystemRoot: testDir,
+            capsuleModuleProjectionRoot: testDir,
             capsuleModuleProjectionPackage: '@caps',
             spineContracts: {
                 ['#' + CapsuleSpineContract['#']]: CapsuleSpineContract
             }
         })
 
-        const standaloneModule = await import('./standalone')
-        const standalone = await standaloneModule.capsule({ encapsulate, CapsulePropertyTypes, makeImportStack })
+        // Load the test projector capsule so the spine can resolve it as a property contract delegate
+        const testProjectorModule = await import('./test-projector')
+        const testProjector = await testProjectorModule.capsule({ encapsulate, CapsulePropertyTypes, makeImportStack })
 
-        const solidjsModule = await import('./solidjs-component.tsx')
-        const solidjs = await solidjsModule.capsule({ encapsulate, CapsulePropertyTypes, makeImportStack })
+        // component1: explicit as: path
+        const component1Module = await import('./component1')
+        const component1 = await component1Module.capsule({ encapsulate, CapsulePropertyTypes, makeImportStack })
 
-        const parent = await encapsulate({
-            '#@stream44.studio/encapsulate/spine-contracts/CapsuleSpineContract.v0': {
-                '#@stream44.studio/encapsulate/structs/Capsule': {},
-                '#': {
-                    '/.~projected/standalone.ts': {
-                        type: CapsulePropertyTypes.Mapping,
-                        value: './standalone.ts'
-                    },
-                    '/.~projected/solidjs-component.tsx': {
-                        type: CapsulePropertyTypes.Mapping,
-                        value: './solidjs-component.tsx'
-                    }
-                }
-            }
-        }, {
-            importMeta: import.meta,
-            importStack: makeImportStack(),
-            capsuleName: 'parent'
-        })
+        // component2: no as: — path comes from caller property name
+        const component2Module = await import('./component2')
+        const component2 = await component2Module.capsule({ encapsulate, CapsulePropertyTypes, makeImportStack })
 
-        const snapshot = await freeze()
+        // Parent capsule that maps both components
+        const componentsModule = await import('./components')
+        await componentsModule.capsule({ encapsulate, CapsulePropertyTypes, makeImportStack, component1, component2 })
 
-        expect(existsSync(projectedFilePath)).toBe(true)
+        snapshot = await freeze()
+    })
 
-        const { commonSpineContractOpts, loadCapsule } = await CapsuleSpineFactory({
-            spineFilesystemRoot: import.meta.dir,
-            capsuleModuleProjectionRoot: import.meta.dir,
-            spineContracts: {
-                ['#' + CapsuleSpineContract['#']]: CapsuleSpineContract
-            }
-        })
+    it('should project Component1 via explicit as: path', () => {
+        expect(existsSync(component1Path)).toBe(true)
+    })
 
-        const { run } = await SpineRuntime({
-            snapshot,
-            spineContracts: {
-                '#@stream44.studio/encapsulate/spine-contracts/CapsuleSpineContract.v0': CapsuleSpineContract(commonSpineContractOpts)
-            },
-            loadCapsule
-        })
+    it('should project Component2 via caller property name path', () => {
+        expect(existsSync(component2Path)).toBe(true)
+    })
 
-        const capturedEvents: any[] = []
-        const result = await run({}, async ({ apis }) => {
-            const projectedCapsule = await import(projectedFilePath)
+    it('projected Component1 should export a working function', async () => {
+        const mod = await import(component1Path)
+        expect(typeof mod.Greeting).toBe('function')
+        expect(mod.Greeting('World')).toBe('Hello, World!')
+        expect(mod.default).toBe(mod.Greeting)
+    })
 
-            const standaloneResult = await projectedCapsule.default({
-                onMembraneEvent: (event: any) => {
-                    capturedEvents.push(event)
-                }
-            })
+    it('projected Component2 should export a working function', async () => {
+        const mod = await import(component2Path)
+        expect(typeof mod.Farewell).toBe('function')
+        expect(mod.Farewell('World')).toBe('Goodbye, World!')
+        expect(mod.default).toBe(mod.Farewell)
+    })
 
-            return standaloneResult
-        })
+    it('projected files should contain the expected comment header', async () => {
+        const { readFile } = await import('fs/promises')
+        const content1 = await readFile(component1Path, 'utf-8')
+        const content2 = await readFile(component2Path, 'utf-8')
 
-        expect(result).toBe('Hello from minimal capsule')
+        expect(content1).toContain('// Projected by test-projector')
+        expect(content2).toContain('// Projected by test-projector')
+    })
 
-        expect(capturedEvents.length).toBeGreaterThan(0)
+    it('freeze snapshot should be produced', () => {
+        expect(snapshot).toBeDefined()
+        expect(snapshot.capsules).toBeDefined()
+    })
 
-        const callEvent = capturedEvents.find(e => e.event === 'call')
-        expect(callEvent).toBeDefined()
-        expect(callEvent?.target?.prop).toBe('encapsulate.dev/standalone')
+    it('projected files can be imported and called directly', async () => {
+        // Import the projected standalone modules
+        const comp1 = await import(component1Path)
+        const comp2 = await import(component2Path)
 
-        const solidjsFilePath = join(testOutputDir, 'solidjs-component.tsx')
-        expect(existsSync(solidjsFilePath)).toBe(true)
-
-        const projectedComponent = await import(solidjsFilePath)
-
-        const componentFactory = await projectedComponent.default()
-
-        expect(typeof componentFactory).toBe('function')
+        // Call the exported functions
+        expect(comp1.Greeting('World')).toBe('Hello, World!')
+        expect(comp2.Farewell('World')).toBe('Goodbye, World!')
     })
 })

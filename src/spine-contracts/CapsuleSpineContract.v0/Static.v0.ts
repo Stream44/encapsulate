@@ -23,6 +23,7 @@ export class ContractCapsuleInstanceFactory {
     public structDisposeFunctions: Array<() => any> = []
     public initFunctions: Array<() => any> = []
     public disposeFunctions: Array<() => any> = []
+    public onFreezeFunctions: Array<() => any> = []
     public mappedCapsuleInstances: Array<any> = []
     protected memoizeCache: Map<string, any> = new Map()
     protected memoizeTimeouts: Map<string, ReturnType<typeof setTimeout>> = new Map()
@@ -104,6 +105,8 @@ export class ContractCapsuleInstanceFactory {
             this.mapInitProperty({ property })
         } else if (property.definition.type === CapsulePropertyTypes.Dispose) {
             this.mapDisposeProperty({ property })
+        } else if (property.definition.type === CapsulePropertyTypes.OnFreeze) {
+            this.mapOnFreezeProperty({ property })
         }
     }
 
@@ -212,9 +215,12 @@ export class ContractCapsuleInstanceFactory {
 
         // Check for existing instance in registry - reuse if available when no options
         // Pre-registration with null allows parent capsules to "claim" a slot before child capsules process
-        // Property contract delegates (structs) always get a fresh instance per parent capsule
+        // Property contract delegates (structs) always get a fresh instance per parent capsule.
+        // CapsuleProjectionContext also needs fresh instances so context injection can find it
+        // in mappedCapsuleInstances during freeze traversal.
         const capsuleName = mappedCapsule.encapsulateOptions?.capsuleName
         const isCapsuleStruct = property.definition.propertyContractDelegate === '#@stream44.studio/encapsulate/structs/Capsule'
+            || property.definition.propertyContractDelegate === '#@stream44.studio/encapsulate/structs/CapsuleProjectionContext'
 
         if (capsuleName && this.instanceRegistry && !isCapsuleStruct) {
             if (this.instanceRegistry.has(capsuleName)) {
@@ -335,6 +341,10 @@ export class ContractCapsuleInstanceFactory {
         }
 
         apiTarget[property.name] = mappedInstance
+        mappedInstance.mappedPropertyName = property.name
+        if (property.definition.propertyContractDelegate) {
+            mappedInstance.isPropertyContractDelegate = true
+        }
         this.mappedCapsuleInstances.push(mappedInstance)
         // Use proxy to unwrap .api for this.self so internal references work
         this.self[property.name] = mappedInstance.api ? new Proxy(mappedInstance.api, {
@@ -349,18 +359,17 @@ export class ContractCapsuleInstanceFactory {
         }) : mappedInstance
 
         // If this mapping has a propertyContractDelegate, also mount the mapped capsule's API
-        // to the property contract namespace for direct access
+        // to the property contract namespace for direct access.
+        // Use a proxy so that later mutations to the delegate's API (e.g. CapsuleProjectionContext
+        // injection during freeze) are visible through the parent's encapsulatedApi.
         if (property.definition.propertyContractDelegate) {
-            // Create the property contract namespace if it doesn't exist
-            if (!this.encapsulatedApi[property.definition.propertyContractDelegate]) {
-                this.encapsulatedApi[property.definition.propertyContractDelegate] = {}
-            }
-
-            // Mount all properties from the mapped capsule's API to the property contract namespace
-            const delegateTarget = this.encapsulatedApi[property.definition.propertyContractDelegate]
-            for (const [key, value] of Object.entries(mappedInstance.api)) {
-                delegateTarget[key] = value
-            }
+            this.encapsulatedApi[property.definition.propertyContractDelegate] = new Proxy(mappedInstance.api, {
+                get: (target: any, prop: string | symbol) => target[prop],
+                set: (target: any, prop: string | symbol, value: any) => { target[prop] = value; return true },
+                ownKeys: (target: any) => Reflect.ownKeys(target),
+                getOwnPropertyDescriptor: (target: any, prop: string | symbol) => Object.getOwnPropertyDescriptor(target, prop) || { configurable: true, enumerable: true, writable: true, value: target[prop] },
+                has: (target: any, prop: string | symbol) => prop in target,
+            })
         }
     }
 
@@ -604,6 +613,12 @@ export class ContractCapsuleInstanceFactory {
         const selfProxy = this.createSelfProxy()
         const boundFunction = property.definition.value.bind(selfProxy)
         this.disposeFunctions.push(boundFunction)
+    }
+
+    protected mapOnFreezeProperty({ property }: { property: any }) {
+        const selfProxy = this.createSelfProxy()
+        const boundFunction = property.definition.value.bind(selfProxy)
+        this.onFreezeFunctions.push(boundFunction)
     }
 
     async freeze(options: any): Promise<any> {

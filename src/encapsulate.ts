@@ -7,7 +7,16 @@ type TSpineOptions = {
     spineFilesystemRoot?: string,
     spineContracts: Record<string, any>,
     staticAnalyzer?: any,
-    timing?: { record: (step: string) => void, chalk?: any }
+    timing?: { record: (step: string) => void, chalk?: any },
+    projectionContext?: {
+        capsuleModuleProjectionPackage?: string,
+        capsuleModuleProjectionRoot?: string,
+        projectionStore?: {
+            writeFile: (filepath: string, content: string) => Promise<void>,
+            getStats?: (filepath: string) => Promise<{ mtime: Date } | null>
+        } | null,
+        capsules?: Record<string, any>
+    }
 }
 
 type TSpineRunOptions = {
@@ -115,6 +124,7 @@ export const CapsulePropertyTypes = {
     StructDispose: 'StructDispose' as const,
     Init: 'Init' as const,
     Dispose: 'Dispose' as const,
+    OnFreeze: 'OnFreeze' as const,
 }
 
 // ##################################################
@@ -430,7 +440,13 @@ export async function Spine(options: TSpineOptions): Promise<TSpine> {
 
             options.timing?.record(`Spine: Freezing ${Object.keys(capsules).length} capsules`)
 
-            await Promise.all(Object.entries(capsules).map(async ([capsuleSourceLineRef, capsule]) => {
+            const processedCapsules = new Set<any>()
+            const freezeVisited = new Set<any>()
+            for (const [capsuleSourceLineRef, capsule] of Object.entries(capsules)) {
+
+                // Skip capsuleName aliases — only process each capsule once via its capsuleSourceLineRef
+                if (processedCapsules.has(capsule)) continue
+                processedCapsules.add(capsule)
 
                 if (!capsule.cst.source.capsuleName) throw new Error(`'capsuleName' must be set for encapsulate options to enable freezing.`)
 
@@ -438,10 +454,95 @@ export async function Spine(options: TSpineOptions): Promise<TSpine> {
                     cst: capsule.cst,
                     spineContracts: {}
                 }
+                // Also register under capsuleName so SpineRuntime can resolve by name
+                if (capsule.cst.source.capsuleName && capsule.cst.source.capsuleName !== capsuleSourceLineRef) {
+                    snapshot.capsules[capsule.cst.source.capsuleName] = snapshot.capsules[capsuleSourceLineRef]
+                }
 
-                const { spineContractCapsuleInstances } = await capsule.makeInstance()
+                const capsuleInstance = await capsule.makeInstance()
 
-                await Promise.all(Object.entries(spineContractCapsuleInstances).map(async ([spineContractUri, spineContractCapsuleInstance]) => {
+                // Run OnFreeze functions so capsules can perform side effects
+                // (e.g. file projection) at build/freeze time
+                async function runOnFreeze(instance: any, parentCapsuleCst?: any, parentCapsuleSourceLineRef?: string, projectionPath?: string, projectionSpineContractUri?: string) {
+                    if (!instance) return
+                    // Use capsuleSourceLineRef for deduplication — this is stable across different
+                    // instance objects of the same capsule (top-level vs mapped child).
+                    // Include projectionPath in the key so the same capsule can project to
+                    // multiple output paths (e.g. standalone delegate used by different parents).
+                    // Fall back to instance identity for internal capsules without a lineRef.
+                    // Use capsuleName as the base key when available (always a unique string),
+                    // otherwise fall back to capsuleSourceLineRef or instance identity.
+                    // This avoids collisions from object refs that all stringify to '[object Object]'.
+                    const baseKey = instance.capsuleName || instance.capsuleSourceLineRef || instance
+                    const freezeKey = projectionPath ? `${baseKey}::${projectionPath}` : baseKey
+                    if (freezeVisited.has(freezeKey)) return
+                    freezeVisited.add(freezeKey)
+
+                    // Inject projection context onto CapsuleProjectionContext instances
+                    // Set values on both the api (encapsulatedApi) and spine contract self
+                    // so they are visible through all proxy chains.
+                    // Scan recursively into mapped children since CapsuleProjectionContext
+                    // may be nested inside a property contract delegate (e.g. a projector capsule).
+                    const projectionCtx = options.projectionContext
+                    if (projectionCtx && instance.mappedCapsuleInstances?.length) {
+                        const injectCtx = (children: any[]) => {
+                            for (const mappedChild of children) {
+                                const childApi = mappedChild.api
+                                if (childApi && mappedChild.capsuleName === '@stream44.studio/encapsulate/structs/CapsuleProjectionContext') {
+                                    const ctx = {
+                                        parentCapsuleCst: parentCapsuleCst,
+                                        parentCapsuleSourceLineRef: parentCapsuleSourceLineRef,
+                                        capsuleModuleProjectionPackage: projectionCtx.capsuleModuleProjectionPackage,
+                                        projectionStore: projectionCtx.projectionStore,
+                                        capsuleSnapshots: projectionCtx.capsules,
+                                        projectionPath: projectionPath,
+                                        spineContractUri: projectionSpineContractUri,
+                                    }
+                                    Object.assign(childApi, ctx)
+                                    // Also update spine contract self for selfProxy access
+                                    for (const childSci of Object.values(mappedChild.spineContractCapsuleInstances || {})) {
+                                        const childSelf = (childSci as any).self
+                                        if (childSelf) Object.assign(childSelf, ctx)
+                                    }
+                                }
+                                // Recurse into delegate's mapped children
+                                if (mappedChild.mappedCapsuleInstances?.length) {
+                                    injectCtx(mappedChild.mappedCapsuleInstances)
+                                }
+                            }
+                        }
+                        injectCtx(instance.mappedCapsuleInstances)
+                    }
+
+                    if (instance.onFreezeFunctions?.length) {
+                        for (const fn of instance.onFreezeFunctions) {
+                            await fn()
+                        }
+                    }
+
+                    if (instance.extendedCapsuleInstance) {
+                        await runOnFreeze(instance.extendedCapsuleInstance, parentCapsuleCst, parentCapsuleSourceLineRef, projectionPath, projectionSpineContractUri)
+                    }
+                    if (instance.mappedCapsuleInstances?.length) {
+                        for (const mappedInstance of instance.mappedCapsuleInstances) {
+                            // Determine projection path from the property name (alias) used for this mapping.
+                            // If the mapped child doesn't define its own path (no / prefix), inherit the parent's projectionPath
+                            // so it flows down to property contract delegates.
+                            const mappedProjectionPath = mappedInstance.mappedPropertyName?.startsWith('/') ? mappedInstance.mappedPropertyName : projectionPath
+                            // For regular mapped capsules (non-struct delegates), use their own CST as
+                            // parentCapsuleCst so nested property contract delegates see the correct parent.
+                            // Property contract delegates (flagged by Static.v0) pass through the current
+                            // parentCapsuleCst so their OnFreeze sees the declaring capsule's CST.
+                            const mappedCapsule = (!mappedInstance.isPropertyContractDelegate && mappedInstance.capsuleName) ? capsules[mappedInstance.capsuleName] : undefined
+                            const childParentCst = mappedCapsule?.cst || parentCapsuleCst
+                            const instanceSourceLineRef = instance.capsuleSourceLineRef || parentCapsuleSourceLineRef
+                            await runOnFreeze(mappedInstance, childParentCst, instanceSourceLineRef, mappedProjectionPath, Object.keys(capsuleInstance.spineContractCapsuleInstances)?.[0])
+                        }
+                    }
+                }
+                await runOnFreeze(capsuleInstance, capsule.cst, capsule.capsuleSourceLineRef)
+
+                await Promise.all(Object.entries(capsuleInstance.spineContractCapsuleInstances).map(async ([spineContractUri, spineContractCapsuleInstance]) => {
 
                     snapshot.capsules[capsuleSourceLineRef] = merge(
                         snapshot.capsules[capsuleSourceLineRef],
@@ -451,7 +552,7 @@ export async function Spine(options: TSpineOptions): Promise<TSpine> {
                         })
                     )
                 }))
-            }))
+            }
 
             options.timing?.record('Spine: Freeze complete')
 
@@ -621,7 +722,7 @@ async function encapsulate(definition: TCapsuleDefinition, options: TCapsuleOpti
                                 // Check if 'as' is defined to use as the property name alias
                                 const propDefTyped = propDef as Record<string, any>
                                 const aliasName = propDefTyped.as
-                                const delegateOptions = propDefTyped.options
+                                let delegateOptions = propDefTyped.options
                                 const contractKey = aliasName || ('#' + propContractUri.substring(1))
 
                                 if (!propertyContractDefinitions[spineContractUri]['#']) {
@@ -835,8 +936,8 @@ async function encapsulate(definition: TCapsuleDefinition, options: TCapsuleOpti
                             moduleFilepath: absoluteModuleFilepath
                         },
                         parentCapsuleSourceUriLineRefInstanceId: parentCapsuleSourceUriLineRefInstanceId
-                            ? sha256(parentCapsuleSourceUriLineRefInstanceId + ':' + (cst?.capsuleSourceUriLineRef || encapsulateOptions.capsuleSourceLineRef))
-                            : sha256(cst?.capsuleSourceUriLineRef || encapsulateOptions.capsuleSourceLineRef),
+                            ? await sha256(parentCapsuleSourceUriLineRefInstanceId + ':' + (cst?.capsuleSourceUriLineRef || encapsulateOptions.capsuleSourceLineRef))
+                            : await sha256(cst?.capsuleSourceUriLineRef || encapsulateOptions.capsuleSourceLineRef),
                         sit
                     })
 
@@ -873,8 +974,8 @@ async function encapsulate(definition: TCapsuleDefinition, options: TCapsuleOpti
                 //   child: sha256(parentCapsuleSourceUriLineRefInstanceId + ":" + capsuleSourceUriLineRef)
                 const capsuleSourceUriLineRef = cst?.capsuleSourceUriLineRef || encapsulateOptions.capsuleSourceLineRef
                 const capsuleSourceUriLineRefInstanceId = parentCapsuleSourceUriLineRefInstanceId
-                    ? sha256(parentCapsuleSourceUriLineRefInstanceId + ':' + capsuleSourceUriLineRef)
-                    : sha256(capsuleSourceUriLineRef)
+                    ? await sha256(parentCapsuleSourceUriLineRefInstanceId + ':' + capsuleSourceUriLineRef)
+                    : await sha256(capsuleSourceUriLineRef)
 
                 // Register this instance in the sit structure if provided
                 if (sit) {
@@ -893,6 +994,7 @@ async function encapsulate(definition: TCapsuleDefinition, options: TCapsuleOpti
                     structDisposeFunctions: [] as Array<() => any>,
                     initFunctions: [] as Array<() => any>,
                     disposeFunctions: [] as Array<() => any>,
+                    onFreezeFunctions: [] as Array<() => any>,
                     mappedCapsuleInstances: [] as Array<any>,
                     rootCapsule: resolvedRootCapsule,
                     capsuleSourceUriLineRefInstanceId,
@@ -986,6 +1088,9 @@ async function encapsulate(definition: TCapsuleDefinition, options: TCapsuleOpti
                     }
                     if (sci.disposeFunctions?.length) {
                         capsuleInstance.disposeFunctions.push(...sci.disposeFunctions)
+                    }
+                    if (sci.onFreezeFunctions?.length) {
+                        capsuleInstance.onFreezeFunctions.push(...sci.onFreezeFunctions)
                     }
                     if (sci.mappedCapsuleInstances?.length) {
                         capsuleInstance.mappedCapsuleInstances.push(...sci.mappedCapsuleInstances)
@@ -1124,15 +1229,15 @@ function relative(from: string, to: string): string {
     return result || '.'
 }
 
-function sha256(input: string): string {
-    // Use Bun's native hasher for speed; falls back to Node crypto
-    if (typeof globalThis.Bun !== 'undefined') {
-        const hasher = new globalThis.Bun.CryptoHasher('sha256')
-        hasher.update(input)
-        return hasher.digest('hex') as string
+async function sha256(input: string): Promise<string> {
+    const data = new TextEncoder().encode(input)
+    const hashBuffer = await crypto.subtle.digest('SHA-256', data)
+    const hashArray = new Uint8Array(hashBuffer)
+    let hex = ''
+    for (let i = 0; i < hashArray.length; i++) {
+        hex += hashArray[i].toString(16).padStart(2, '0')
     }
-    const { createHash } = require('crypto')
-    return createHash('sha256').update(input).digest('hex')
+    return hex
 }
 
 function isObject(item: any): boolean {

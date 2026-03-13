@@ -1,7 +1,5 @@
 import { CapsulePropertyTypes } from "../../encapsulate"
 import { ContractCapsuleInstanceFactory, CapsuleInstanceRegistry } from "./Static.v0"
-import { readFileSync, existsSync } from "node:fs"
-import { dirname, relative, join } from "node:path"
 
 type CallerContext = {
     capsuleSourceLineRef: string
@@ -60,6 +58,7 @@ class MembraneContractCapsuleInstanceFactory extends ContractCapsuleInstanceFact
     private setCurrentCallerContext: (ctx: CallerContext | undefined) => void
     private onMembraneEvent?: (event: any) => void
     private enableCallerStackInference: boolean
+    private npmUriForFilepathSync?: (filepath: string) => string | null
     private encapsulateOptions: any
     private capsuleSourceNameRef?: string
     private capsuleSourceNameRefHash?: string
@@ -78,6 +77,7 @@ class MembraneContractCapsuleInstanceFactory extends ContractCapsuleInstanceFact
         freezeCapsule,
         onMembraneEvent,
         enableCallerStackInference,
+        npmUriForFilepathSync,
         encapsulateOptions,
         getEventIndex,
         incrementEventIndex,
@@ -99,6 +99,7 @@ class MembraneContractCapsuleInstanceFactory extends ContractCapsuleInstanceFact
         freezeCapsule?: (capsule: any) => Promise<any>
         onMembraneEvent?: (event: any) => void
         enableCallerStackInference: boolean
+        npmUriForFilepathSync?: (filepath: string) => string | null
         encapsulateOptions: any
         getEventIndex: () => number
         incrementEventIndex: () => number
@@ -116,6 +117,7 @@ class MembraneContractCapsuleInstanceFactory extends ContractCapsuleInstanceFact
         this.setCurrentCallerContext = setCurrentCallerContext
         this.onMembraneEvent = onMembraneEvent
         this.enableCallerStackInference = enableCallerStackInference
+        this.npmUriForFilepathSync = npmUriForFilepathSync
         this.encapsulateOptions = encapsulateOptions
         this.capsuleSourceNameRef = capsule?.cst?.capsuleSourceNameRef
         this.capsuleSourceNameRefHash = capsule?.cst?.capsuleSourceNameRefHash
@@ -184,7 +186,7 @@ class MembraneContractCapsuleInstanceFactory extends ContractCapsuleInstanceFact
                                 if (this.enableCallerStackInference) {
                                     const stackStr = new Error('[MAPPED_CAPSULE]').stack
                                     if (stackStr) {
-                                        const stackFrames = parseCallerFromStack(stackStr, this.spineFilesystemRoot)
+                                        const stackFrames = parseCallerFromStack(stackStr, this.spineFilesystemRoot, this.npmUriForFilepathSync)
                                         if (stackFrames.length > 0) {
                                             const callerInfo = extractCallerInfo(stackFrames, 3)
                                             callerCtx.fileUri = callerInfo.fileUri
@@ -311,7 +313,7 @@ class MembraneContractCapsuleInstanceFactory extends ContractCapsuleInstanceFact
                     if (this.enableCallerStackInference) {
                         const stackStr = new Error('[MAPPED_CAPSULE]').stack
                         if (stackStr) {
-                            const stackFrames = parseCallerFromStack(stackStr, this.spineFilesystemRoot)
+                            const stackFrames = parseCallerFromStack(stackStr, this.spineFilesystemRoot, this.npmUriForFilepathSync)
                             if (stackFrames.length > 0) {
                                 const callerInfo = extractCallerInfo(stackFrames, 3)
                                 callerCtx.fileUri = callerInfo.fileUri
@@ -374,7 +376,7 @@ class MembraneContractCapsuleInstanceFactory extends ContractCapsuleInstanceFact
                                 if (this.enableCallerStackInference) {
                                     const stackStr = new Error('[PROPERTY_CONTRACT_DELEGATE]').stack
                                     if (stackStr) {
-                                        const stackFrames = parseCallerFromStack(stackStr, this.spineFilesystemRoot)
+                                        const stackFrames = parseCallerFromStack(stackStr, this.spineFilesystemRoot, this.npmUriForFilepathSync)
                                         if (stackFrames.length > 0) {
                                             const callerInfo = extractCallerInfo(stackFrames, 3)
                                             callerCtx.fileUri = callerInfo.fileUri
@@ -892,7 +894,7 @@ class MembraneContractCapsuleInstanceFactory extends ContractCapsuleInstanceFact
         } else if (this.enableCallerStackInference) {
             const stackStr = new Error('[MEMBRANE_EVENT]').stack
             if (stackStr) {
-                const stackFrames = parseCallerFromStack(stackStr, this.spineFilesystemRoot)
+                const stackFrames = parseCallerFromStack(stackStr, this.spineFilesystemRoot, this.npmUriForFilepathSync)
                 if (stackFrames.length > 0) {
                     const callerInfo = extractCallerInfo(stackFrames, 3)
                     event.caller = {
@@ -911,7 +913,8 @@ export function CapsuleSpineContract({
     enableCallerStackInference = false,
     spineFilesystemRoot,
     resolve,
-    importCapsule
+    importCapsule,
+    npmUriForFilepath
 }: {
     onMembraneEvent?: (event: any) => void
     freezeCapsule?: (capsule: any) => Promise<any>
@@ -919,11 +922,27 @@ export function CapsuleSpineContract({
     spineFilesystemRoot?: string
     resolve?: (uri: string, parentFilepath: string) => Promise<string>
     importCapsule?: (filepath: string) => Promise<any>
+    npmUriForFilepath?: (filepath: string) => Promise<string | null>
 } = {}) {
 
     let eventIndex = 0
     let currentCallerContext: CallerContext | undefined = undefined
     const instanceRegistry: CapsuleInstanceRegistry = new Map()
+
+    // Sync cache for npmUriForFilepath — async calls populate the cache,
+    // sync reads return cached values (raw filepath fallback on cache miss).
+    const npmUriCache = new Map<string, string | null>()
+    const npmUriForFilepathSync = npmUriForFilepath
+        ? (filepath: string): string | null => {
+            if (npmUriCache.has(filepath)) return npmUriCache.get(filepath)!
+            // Fire async resolution to populate cache for next access
+            npmUriForFilepath(filepath).then(
+                uri => npmUriCache.set(filepath, uri),
+                () => npmUriCache.set(filepath, null)
+            )
+            return null
+        }
+        : undefined
 
     // Re-entrancy guard: suppress event emission while inside an onMembraneEvent callback.
     // This prevents consumers (e.g. JSON.stringify on event.value) from triggering proxy getters
@@ -955,6 +974,7 @@ export function CapsuleSpineContract({
                 importCapsule,
                 onMembraneEvent: guardedOnMembraneEvent,
                 enableCallerStackInference,
+                npmUriForFilepathSync,
                 encapsulateOptions,
                 getEventIndex: () => eventIndex,
                 incrementEventIndex: () => eventIndex++,
@@ -975,67 +995,7 @@ export function CapsuleSpineContract({
 CapsuleSpineContract['#'] = '@stream44.studio/encapsulate/spine-contracts/CapsuleSpineContract.v0'
 
 
-
-
-// Cache for synchronous npm URI lookups (directory -> package name or null)
-const npmUriCache = new Map<string, string | null>()
-
-function constructNpmUriSync(absoluteFilepath: string): string | null {
-    // Only process absolute paths — skip V8 internal markers like "native", "node:*", etc.
-    if (!absoluteFilepath.startsWith('/')) {
-        return null
-    }
-
-    // Check for /node_modules/ in the path — use the last occurrence to handle nested node_modules
-    const nodeModulesMarker = '/node_modules/'
-    const lastIdx = absoluteFilepath.lastIndexOf(nodeModulesMarker)
-    if (lastIdx !== -1) {
-        return absoluteFilepath.substring(lastIdx + nodeModulesMarker.length)
-    }
-
-    let currentDir = dirname(absoluteFilepath)
-    const maxDepth = 20
-
-    for (let i = 0; i < maxDepth; i++) {
-        if (npmUriCache.has(currentDir)) {
-            const cachedName = npmUriCache.get(currentDir)
-            if (cachedName) {
-                const relativeFromPackage = relative(currentDir, absoluteFilepath)
-                return `${cachedName}/${relativeFromPackage}`
-            }
-            // null means no package.json with name found at this level, continue up
-            const parentDir = dirname(currentDir)
-            if (parentDir === currentDir) break
-            currentDir = parentDir
-            continue
-        }
-
-        const packageJsonPath = join(currentDir, 'package.json')
-        try {
-            if (existsSync(packageJsonPath)) {
-                const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf-8'))
-                const packageName = packageJson.name
-                npmUriCache.set(currentDir, packageName || null)
-                if (packageName) {
-                    const relativeFromPackage = relative(currentDir, absoluteFilepath)
-                    return `${packageName}/${relativeFromPackage}`
-                }
-            } else {
-                npmUriCache.set(currentDir, null)
-            }
-        } catch {
-            npmUriCache.set(currentDir, null)
-        }
-
-        const parentDir = dirname(currentDir)
-        if (parentDir === currentDir) break
-        currentDir = parentDir
-    }
-
-    return null
-}
-
-function parseCallerFromStack(stack: string, spineFilesystemRoot?: string): Array<{ function?: string, fileUri?: string, line?: number, column?: number }> {
+function parseCallerFromStack(stack: string, spineFilesystemRoot?: string, npmUriForFilepathSync?: (filepath: string) => string | null): Array<{ function?: string, fileUri?: string, line?: number, column?: number }> {
     const lines = stack.split('\n')
     const result: Array<{ function?: string, fileUri?: string, line?: number, column?: number }> = []
 
@@ -1082,7 +1042,7 @@ function parseCallerFromStack(stack: string, spineFilesystemRoot?: string): Arra
 
             // Convert absolute filepaths to npm URIs
             if (rawFilepath) {
-                const npmUri = constructNpmUriSync(rawFilepath)
+                const npmUri = npmUriForFilepathSync ? npmUriForFilepathSync(rawFilepath) : null
                 if (npmUri) {
                     // Strip file extension from URI for consistency
                     frame.fileUri = npmUri.replace(/\.(ts|tsx|js|jsx)$/, '')
