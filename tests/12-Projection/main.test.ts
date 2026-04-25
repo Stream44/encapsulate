@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll } from 'bun:test'
-import { CapsuleSpineContract } from '../../src/spine-contracts/CapsuleSpineContract.v0/Static.v0'
-import { CapsuleSpineFactory } from '../../src/spine-factories/CapsuleSpineFactory.v0'
+import { CapsuleSpineContract } from '../../src/spine-contracts/CapsuleSpineContract.v0/Static'
+import { CapsuleSpineFactory } from '../../src/spine-factories/CapsuleSpineFactory'
 import { rm } from 'fs/promises'
 import { join } from 'path'
 import { existsSync } from 'fs'

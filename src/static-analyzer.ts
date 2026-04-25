@@ -85,6 +85,7 @@ const MODULE_GLOBAL_BUILTINS = new Set([
 
     // Bun runtime
     'Bun',
+    'HTMLRewriter',
 
     // Node.js Buffer
     'Buffer',
@@ -218,6 +219,7 @@ const MODULE_GLOBAL_BUILTINS = new Set([
     'decodeURIComponent',
     'escape',
     'unescape',
+    'eval',
 ])
 
 export function StaticAnalyzer({
@@ -1937,6 +1939,19 @@ function extractAndValidateAmbientReferences(
     // Collect parameter names as local identifiers
     for (const param of fn.parameters) {
         extractBindingIdentifiers(param.name)
+    }
+
+    // Pre-collect all function declarations from the function body (hoisting)
+    // Function declarations are hoisted in JavaScript, so they can be referenced
+    // before their source position. We must collect them before the main visit pass.
+    function preCollectDeclarations(node: ts.Node) {
+        if (ts.isFunctionDeclaration(node) && node.name && ts.isIdentifier(node.name)) {
+            localIdentifiers.add(node.name.text)
+        }
+        ts.forEachChild(node, preCollectDeclarations)
+    }
+    if (fn.body) {
+        preCollectDeclarations(fn.body)
     }
 
     // Traverse the function body to find identifiers

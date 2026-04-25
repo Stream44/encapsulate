@@ -1,8 +1,8 @@
 
 import { describe, it, expect } from 'bun:test'
 import { join } from 'node:path'
-import { CapsuleSpineFactory } from "../../src/spine-factories/CapsuleSpineFactory.v0"
-import { CapsuleSpineContract } from "../../src/spine-contracts/CapsuleSpineContract.v0/Static.v0"
+import { CapsuleSpineFactory } from "../../src/spine-factories/CapsuleSpineFactory"
+import { CapsuleSpineContract } from "../../src/spine-contracts/CapsuleSpineContract.v0/Static"
 
 
 it('Reuse existing capsule instance when mapping has no options', async function () {

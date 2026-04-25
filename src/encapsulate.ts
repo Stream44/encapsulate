@@ -125,6 +125,7 @@ export const CapsulePropertyTypes = {
     Init: 'Init' as const,
     Dispose: 'Dispose' as const,
     OnFreeze: 'OnFreeze' as const,
+    ProxyFunction: 'ProxyFunction' as const,
 }
 
 // ##################################################
@@ -198,8 +199,8 @@ export async function SpineRuntime(options: TSpineRuntimeOptions): Promise<TSpin
 
                             // If the value is a raw capsule instance (has spineContractCapsuleInstances
                             // but is NOT a Proxy that handles API access), unwrap it
-                            // Static.v0 sets apiTarget[property.name] = mappedInstance (raw)
-                            // Membrane.v0 sets apiTarget[property.name] = new Proxy(...) which handles API access
+                            // Static sets apiTarget[property.name] = mappedInstance (raw)
+                            // Membrane sets apiTarget[property.name] = new Proxy(...) which handles API access
                             if (value && typeof value === 'object' && value.spineContractCapsuleInstances) {
                                 // Check if this is a raw capsule instance by seeing if it has .api
                                 // and the .api doesn't have the same spineContractCapsuleInstances
@@ -531,7 +532,7 @@ export async function Spine(options: TSpineOptions): Promise<TSpine> {
                             const mappedProjectionPath = mappedInstance.mappedPropertyName?.startsWith('/') ? mappedInstance.mappedPropertyName : projectionPath
                             // For regular mapped capsules (non-struct delegates), use their own CST as
                             // parentCapsuleCst so nested property contract delegates see the correct parent.
-                            // Property contract delegates (flagged by Static.v0) pass through the current
+                            // Property contract delegates (flagged by Static) pass through the current
                             // parentCapsuleCst so their OnFreeze sees the declaring capsule's CST.
                             const mappedCapsule = (!mappedInstance.isPropertyContractDelegate && mappedInstance.capsuleName) ? capsules[mappedInstance.capsuleName] : undefined
                             const childParentCst = mappedCapsule?.cst || parentCapsuleCst

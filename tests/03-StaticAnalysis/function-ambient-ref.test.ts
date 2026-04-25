@@ -2,8 +2,8 @@
 import { describe, it, expect } from 'bun:test'
 import { join } from 'path'
 import { readFile } from 'fs/promises'
-import { CapsuleSpineFactory } from "../../src/spine-factories/CapsuleSpineFactory.v0"
-import { CapsuleSpineContract } from "../../src/spine-contracts/CapsuleSpineContract.v0/Static.v0"
+import { CapsuleSpineFactory } from "../../src/spine-factories/CapsuleSpineFactory"
+import { CapsuleSpineContract } from "../../src/spine-contracts/CapsuleSpineContract.v0/Static"
 
 // This function uses an import (readFile) so it has external dependencies
 // and cannot be classified as module-local by the static analyzer.

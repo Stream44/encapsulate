@@ -2,8 +2,8 @@
 import { describe, it, expect } from 'bun:test'
 import { join } from 'path'
 import { mkdir, writeFile } from 'fs/promises'
-import { CapsuleSpineFactory } from "../../src/spine-factories/CapsuleSpineFactory.v0"
-import { CapsuleSpineContract } from "../../src/spine-contracts/CapsuleSpineContract.v0/Static.v0"
+import { CapsuleSpineFactory } from "../../src/spine-factories/CapsuleSpineFactory"
+import { CapsuleSpineContract } from "../../src/spine-contracts/CapsuleSpineContract.v0/Static"
 
 
 describe('Enclosing scope variable inlining', () => {

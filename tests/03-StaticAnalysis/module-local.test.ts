@@ -1,8 +1,8 @@
 
 import { describe, it, expect } from 'bun:test'
 import { join } from 'path'
-import { CapsuleSpineFactory, merge } from "../../src/spine-factories/CapsuleSpineFactory.v0"
-import { CapsuleSpineContract } from "../../src/spine-contracts/CapsuleSpineContract.v0/Static.v0"
+import { CapsuleSpineFactory, merge } from "../../src/spine-factories/CapsuleSpineFactory"
+import { CapsuleSpineContract } from "../../src/spine-contracts/CapsuleSpineContract.v0/Static"
 
 describe('Module-local function detection', () => {
 

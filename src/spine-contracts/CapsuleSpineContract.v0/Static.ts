@@ -107,6 +107,8 @@ export class ContractCapsuleInstanceFactory {
             this.mapDisposeProperty({ property })
         } else if (property.definition.type === CapsulePropertyTypes.OnFreeze) {
             this.mapOnFreezeProperty({ property })
+        } else if (property.definition.type === CapsulePropertyTypes.ProxyFunction) {
+            this.mapProxyFunctionProperty({ property })
         }
     }
 
@@ -134,11 +136,76 @@ export class ContractCapsuleInstanceFactory {
 
             // Use cst.source.moduleFilepath (always filesystem-relative) for path resolution.
             // encapsulateOptions.moduleFilepath may be an npm URI when loaded from projected files.
-            const moduleFilepath = this.capsule.cst?.source?.moduleFilepath || this.capsule.encapsulateOptions?.moduleFilepath
+            // However, cst.source.moduleFilepath may be relative to a different package root than
+            // the current spineFilesystemRoot (e.g. cross-package capsule references). In that case,
+            // fall back to encapsulateOptions.moduleFilepath which is always relative to current spine root.
+            let moduleFilepath = this.capsule.cst?.source?.moduleFilepath || this.capsule.encapsulateOptions?.moduleFilepath
             if (!moduleFilepath) throw new Error(`'moduleFilepath' not available on capsule!`)
 
-            const parentPath = join(this.spineFilesystemRoot, moduleFilepath)
-            const filepath = await this.resolve(property.definition.value, parentPath)
+            // moduleFilepath may be a relative filesystem path (e.g. "../../../caps/Foo.ts")
+            // or an npm-style URI (e.g. "@stream44.studio/t44-docker.com/caps/Project")
+            // after freeze/hoist cycles. join(spineRoot, npmUri) produces a bogus path when
+            // the URI is npm-style and spineRoot is narrow. Detect this by checking if the
+            // moduleFilepath looks like an npm URI (starts with @, or doesn't start with / or .),
+            // and resolve it to get the actual filesystem path.
+            let parentPath = join(this.spineFilesystemRoot, moduleFilepath)
+            if (!moduleFilepath.startsWith('/') && !moduleFilepath.startsWith('.')) {
+                // Looks like an npm-style URI or filesystem-convention path — resolve it
+                try {
+                    // Try with @ prefix first (npm URI convention)
+                    if (moduleFilepath.startsWith('@')) {
+                        parentPath = await this.resolve(moduleFilepath, this.spineFilesystemRoot)
+                    } else {
+                        // May be a filesystem-convention path like "scope/packages/pkg/path"
+                        // Try resolving as @scope/pkg/path by extracting scope and package name
+                        const parts = moduleFilepath.split('/')
+                        if (parts.length >= 3 && parts[1] === 'packages') {
+                            const scope = parts[0]
+                            const pkg = parts[2]
+                            const subpath = parts.slice(3).join('/')
+                            const npmUri = subpath ? `@${scope}/${pkg}/${subpath}` : `@${scope}/${pkg}`
+                            parentPath = await this.resolve(npmUri, this.spineFilesystemRoot)
+                        }
+                    }
+                } catch {
+                    // Fall back to the joined path if resolution fails
+                }
+            }
+            let filepath: string
+            try {
+                filepath = await this.resolve(property.definition.value, parentPath)
+            } catch (resolveError) {
+                // cst.source.moduleFilepath may be relative to a different package root than spineFilesystemRoot
+                // (e.g. cross-package capsule references). Fall back to encapsulateOptions.moduleFilepath
+                // which is always relative to the current spine root.
+                const fallbackModuleFilepath = this.capsule.encapsulateOptions?.moduleFilepath
+                if (fallbackModuleFilepath && fallbackModuleFilepath !== moduleFilepath) {
+                    // The fallback moduleFilepath may be a relative path or an npm URI.
+                    // Apply the same resolution logic as the primary path.
+                    let fallbackParentPath = join(this.spineFilesystemRoot, fallbackModuleFilepath)
+                    if (!fallbackModuleFilepath.startsWith('/') && !fallbackModuleFilepath.startsWith('.')) {
+                        try {
+                            if (fallbackModuleFilepath.startsWith('@')) {
+                                fallbackParentPath = await this.resolve!(fallbackModuleFilepath, this.spineFilesystemRoot)
+                            } else {
+                                const parts = fallbackModuleFilepath.split('/')
+                                if (parts.length >= 3 && parts[1] === 'packages') {
+                                    const scope = parts[0]
+                                    const pkg = parts[2]
+                                    const subpath = parts.slice(3).join('/')
+                                    const npmUri = subpath ? `@${scope}/${pkg}/${subpath}` : `@${scope}/${pkg}`
+                                    fallbackParentPath = await this.resolve!(npmUri, this.spineFilesystemRoot)
+                                }
+                            }
+                        } catch {
+                            // Fall back to the joined path
+                        }
+                    }
+                    filepath = await this.resolve(property.definition.value, fallbackParentPath)
+                } else {
+                    throw resolveError
+                }
+            }
             mappedCapsule = await this.importCapsule(filepath)
         } else if (
             typeof property.definition.value === 'object' &&
@@ -405,19 +472,27 @@ export class ContractCapsuleInstanceFactory {
 
                 // First check if the property exists in target (this.self)
                 if (prop in target) {
+                    // Virtual dispatch: if child has an override for this property,
+                    // prefer the child's version over self (which may hold the parent's bound fn)
+                    if (factory.childEncapsulatedApis) {
+                        for (const childApi of factory.childEncapsulatedApis) {
+                            if (prop in childApi) return childApi[prop]
+                        }
+                    }
                     return target[prop]
                 }
 
-                // Fall back to encapsulatedApi
-                if (prop in factory.encapsulatedApi) {
-                    return factory.encapsulatedApi[prop]
-                }
-
-                // Fall back to child capsule APIs (for parent→child function delegation)
+                // Check child capsule APIs (virtual dispatch —
+                // child overrides take precedence over parent's own API)
                 if (factory.childEncapsulatedApis) {
                     for (const childApi of factory.childEncapsulatedApis) {
                         if (prop in childApi) return childApi[prop]
                     }
+                }
+
+                // Fall back to own encapsulatedApi
+                if (prop in factory.encapsulatedApi) {
+                    return factory.encapsulatedApi[prop]
                 }
 
                 // Fall back to extended capsule's API
@@ -447,12 +522,12 @@ export class ContractCapsuleInstanceFactory {
             getOwnPropertyDescriptor: (target: any, prop: string | symbol) => {
                 if (typeof prop === 'symbol') return Object.getOwnPropertyDescriptor(target, prop)
                 if (prop in target) return Object.getOwnPropertyDescriptor(target, prop)
-                if (prop in factory.encapsulatedApi) return { configurable: true, enumerable: true, writable: true, value: factory.encapsulatedApi[prop as string] }
                 if (factory.childEncapsulatedApis) {
                     for (const childApi of factory.childEncapsulatedApis) {
                         if (prop in childApi) return { configurable: true, enumerable: true, writable: true, value: childApi[prop as string] }
                     }
                 }
+                if (prop in factory.encapsulatedApi) return { configurable: true, enumerable: true, writable: true, value: factory.encapsulatedApi[prop as string] }
                 if (extendedApi && prop in extendedApi) return { configurable: true, enumerable: true, writable: true, value: extendedApi[prop as string] }
                 return undefined
             }
@@ -562,6 +637,38 @@ export class ContractCapsuleInstanceFactory {
                 enumerable: true,
                 configurable: true
             })
+        }
+    }
+
+    protected mapProxyFunctionProperty({ property }: { property: any }) {
+        const apiTarget = this.getApiTarget({ property })
+        const selfProxy = this.createSelfProxy()
+
+        const childTargetFn = property.definition.value.target
+        const childInvokeFn = property.definition.value.invoke
+
+        // Inherit missing parts from parent's ProxyFunction (if extending)
+        const parentParts = this.self[`__proxyFn_${property.name}`]
+        const targetFn = childTargetFn ?? parentParts?.target
+        const invokeFn = childInvokeFn ?? parentParts?.invoke
+
+        if (!targetFn) throw new Error(`ProxyFunction '${property.name}': target() is required`)
+        if (!invokeFn) throw new Error(`ProxyFunction '${property.name}': invoke() is required`)
+
+        // Store parts for potential child override
+        this.self[`__proxyFn_${property.name}`] = { target: targetFn, invoke: invokeFn }
+
+        apiTarget[property.name] = (...args: any[]) => {
+            // 1. Call invoke() bound to selfProxy to transform args
+            const transformedArgs = invokeFn.call(selfProxy, ...args)
+            // 2. Call target() bound to selfProxy to get the function to call
+            const target = targetFn.call(selfProxy)
+            // 3. If invoke returned a promise, await it then call target
+            if (transformedArgs && typeof transformedArgs.then === 'function') {
+                return transformedArgs.then((resolved: any) => target(resolved))
+            }
+            // 4. Call target with the transformed args
+            return target(transformedArgs)
         }
     }
 

@@ -1,8 +1,8 @@
 
 import { describe, it, expect } from 'bun:test'
 import { join, dirname } from 'path'
-import { CapsuleSpineFactory } from "../../src/spine-factories/CapsuleSpineFactory.v0"
-import { CapsuleSpineContract } from "../../src/spine-contracts/CapsuleSpineContract.v0/Static.v0"
+import { CapsuleSpineFactory } from "../../src/spine-factories/CapsuleSpineFactory"
+import { CapsuleSpineContract } from "../../src/spine-contracts/CapsuleSpineContract.v0/Static"
 
 describe('require.resolve in capsule functions', () => {
 

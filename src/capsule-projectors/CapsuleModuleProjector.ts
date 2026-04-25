@@ -50,7 +50,7 @@ async function constructCacheFilePath(moduleFilepath: string, importStackLine: n
  * Finds the nearest package.json and constructs an npm URI for cache files.
  * First checks if the path contains /node_modules/ and if so, extracts the portion
  * after the last /node_modules/ occurrence for consistent paths in dev and installed mode.
- * This matches the logic from static-analyzer.v0.ts
+ * This matches the logic from static-analyzer.ts
  */
 async function constructNpmUriForCache(absoluteFilepath: string, spineRoot: string): Promise<string | null> {
     // Check for /node_modules/ in the path — use the last occurrence to handle nested node_modules
@@ -742,7 +742,7 @@ export function CapsuleModuleProjector({
         const hasStandalone = hasStandaloneProperty(capsule, spineContractUri)
 
         // Add runtime imports for standalone functions
-        const runtimeImport = hasStandalone ? `"use client"\nimport { Spine, SpineRuntime } from '@stream44.studio/encapsulate/encapsulate'\nimport { CapsuleSpineContract } from '@stream44.studio/encapsulate/spine-contracts/CapsuleSpineContract.v0/Membrane.v0'\n` : ''
+        const runtimeImport = hasStandalone ? `"use client"\nimport { Spine, SpineRuntime } from '@stream44.studio/encapsulate/encapsulate'\nimport { CapsuleSpineContract } from '@stream44.studio/encapsulate/spine-contracts/CapsuleSpineContract.v0/Membrane'\n` : ''
 
         // Generate default export based on capsule type
         let defaultExport = ''
@@ -1072,7 +1072,7 @@ ${defaultExport}
             const mappedCapsuleExpression = rewriteCapsuleExpressionWithCST(mappedCapsule)
 
             // Add runtime imports for standalone functions
-            const mappedRuntimeImport = mappedHasStandalone ? `"use client"\nimport { Spine, SpineRuntime } from '@stream44.studio/encapsulate/encapsulate'\nimport { CapsuleSpineContract } from '@stream44.studio/encapsulate/spine-contracts/CapsuleSpineContract.v0/Membrane.v0'\n` : ''
+            const mappedRuntimeImport = mappedHasStandalone ? `"use client"\nimport { Spine, SpineRuntime } from '@stream44.studio/encapsulate/encapsulate'\nimport { CapsuleSpineContract } from '@stream44.studio/encapsulate/spine-contracts/CapsuleSpineContract.v0/Membrane'\n` : ''
 
             let mappedDefaultExport = ''
             if (mappedHasStandalone) {

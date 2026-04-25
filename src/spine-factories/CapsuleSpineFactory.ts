@@ -1,8 +1,8 @@
 import { join, dirname, relative, resolve as pathResolve } from 'path'
 import { writeFile, mkdir, readFile, stat } from 'fs/promises'
 import { Spine, SpineRuntime, CapsulePropertyTypes, makeImportStack, merge } from "../encapsulate"
-import { StaticAnalyzer } from "../../src/static-analyzer.v0"
-import { CapsuleModuleProjector } from "../../src/capsule-projectors/CapsuleModuleProjector.v0"
+import { StaticAnalyzer } from "../../src/static-analyzer"
+import { CapsuleModuleProjector } from "../../src/capsule-projectors/CapsuleModuleProjector"
 
 
 export { merge }
@@ -129,10 +129,39 @@ async function resolve(uri: string, fromPath: string, spineRoot?: string): Promi
             }
 
             // Also traverse up from fromPath (the importing file) checking:
-            // 1. If current dir IS the package (self-package resolution)
-            // 2. node_modules/@scope/pkg at each level
+            // 1. The scope/packages/pkg filesystem convention at each level
+            // 2. If current dir IS the package (self-package resolution)
+            // 3. node_modules/@scope/pkg at each level
             let fromDir = dirname(fromPath)
             while (true) {
+                // Check scope/packages/pkg filesystem convention
+                if (subpath) {
+                    const fsPath = join(fromDir, scope, 'packages', pkg, subpath + '.ts')
+                    try { await stat(fsPath); return fsPath } catch { }
+                    try { await stat(join(fromDir, scope, 'packages', pkg, subpath)); return join(fromDir, scope, 'packages', pkg, subpath) } catch { }
+                }
+                const fsPkgDir = join(fromDir, scope, 'packages', pkg)
+                try {
+                    const fsPjPath = join(fsPkgDir, 'package.json')
+                    const fsPj = JSON.parse(await readFile(fsPjPath, 'utf-8'))
+                    if (fsPj.name === `@${scope}/${pkg}`) {
+                        if (subpath && fsPj.exports) {
+                            const exportKey = './' + subpath
+                            const exportValue = fsPj.exports[exportKey]
+                            if (typeof exportValue === 'string') {
+                                return pathResolve(fsPkgDir, exportValue)
+                            }
+                        } else if (!subpath && fsPj.exports?.['.']) {
+                            const mainExport = fsPj.exports['.']
+                            if (typeof mainExport === 'string') {
+                                return pathResolve(fsPkgDir, mainExport)
+                            }
+                        } else if (!subpath && fsPj.main) {
+                            return pathResolve(fsPkgDir, fsPj.main)
+                        }
+                    }
+                } catch { }
+
                 // Check if this directory's package.json matches the requested package
                 try {
                     const pjPath = join(fromDir, 'package.json')

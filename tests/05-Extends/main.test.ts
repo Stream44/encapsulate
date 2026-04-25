@@ -1,8 +1,8 @@
 
 import { describe, it, expect } from 'bun:test'
 import { join } from 'path'
-import { CapsuleSpineFactory } from "../../src/spine-factories/CapsuleSpineFactory.v0"
-import { CapsuleSpineContract } from "../../src/spine-contracts/CapsuleSpineContract.v0/Static.v0"
+import { CapsuleSpineFactory } from "../../src/spine-factories/CapsuleSpineFactory"
+import { CapsuleSpineContract } from "../../src/spine-contracts/CapsuleSpineContract.v0/Static"
 
 
 it('Extend another capsule', async function () {
@@ -719,10 +719,166 @@ it('this.self should work with GetterFunction properties', async function () {
     })
 
     // this.self.config should call parent's own config getter
-    // this.config also calls parent's config getter (since we're in parent's context)
+    // this.config calls child's config getter (virtual dispatch — child override takes precedence)
     // Both see child's baseValue because this.baseValue resolves through shared self
     expect(result as any).toEqual({
         configFromSelf: { source: 'parent', baseValue: 'child-base' },
-        configFromThis: { source: 'parent', baseValue: 'child-base' }
+        configFromThis: { source: 'child', baseValue: 'child-base' }
     })
+})
+
+
+it('extendsCapsule with relative string URI resolves from co-located spineFilesystemRoot', async function () {
+
+    // Use import.meta.dir as spineFilesystemRoot (narrow scope — same as standalone-rt does)
+    // This simulates the case where a test maps a capsule that uses extendsCapsule: './base-capsule'
+    const { encapsulate, run, CapsulePropertyTypes, makeImportStack } = await CapsuleSpineFactory({
+        spineFilesystemRoot: import.meta.dir,
+        staticAnalysisEnabled: false,
+        spineContracts: {
+            ['#' + CapsuleSpineContract['#']]: CapsuleSpineContract
+        }
+    })
+
+    // Import the child capsule file which uses extendsCapsule: './base-capsule'
+    const childCapsuleModule = await import('./child-of-base-capsule')
+    const childCapsule = await childCapsuleModule.capsule({ encapsulate, CapsulePropertyTypes, makeImportStack })
+
+    const result = await run({
+        overrides: {
+            ['@test/child-of-base-capsule']: {
+                '#': {
+                    baseProperty: 'overridden-base'
+                }
+            }
+        }
+    }, async ({ apis }: any) => {
+        return {
+            childFunction: apis['@test/child-of-base-capsule'].childFunction(),
+            baseFunction: apis['@test/child-of-base-capsule'].baseFunction(),
+        }
+    })
+
+    expect((result as any).childFunction).toBe('Child: overridden-base + child-value')
+    expect((result as any).baseFunction).toBe('Base: overridden-base')
+})
+
+
+it('Child Function override should be called when parent Function uses this.method() (virtual dispatch)', async function () {
+
+    const { encapsulate, run, CapsulePropertyTypes, makeImportStack } = await CapsuleSpineFactory({
+        spineFilesystemRoot: join(import.meta.dir, '../../../../..'),
+        staticAnalysisEnabled: false,
+        spineContracts: {
+            ['#' + CapsuleSpineContract['#']]: CapsuleSpineContract
+        }
+    })
+
+    // Parent capsule with a "hoist" function that calls this.startServer()
+    const parentCapsule = await encapsulate({
+        '#@stream44.studio/encapsulate/spine-contracts/CapsuleSpineContract.v0': {
+            '#': {
+                startServer: {
+                    type: CapsulePropertyTypes.Function,
+                    value: function (this: any): string {
+                        return 'parent-server'
+                    }
+                },
+                hoist: {
+                    type: CapsulePropertyTypes.Function,
+                    value: function (this: any): string {
+                        // This should call child's startServer override
+                        return `hoisted: ${this.startServer()}`
+                    }
+                }
+            }
+        }
+    }, {
+        importMeta: import.meta,
+        importStack: makeImportStack(),
+        capsuleName: 'parentCapsule'
+    })
+
+    // Child capsule extends parent and overrides startServer
+    const childCapsule = await encapsulate({
+        '#@stream44.studio/encapsulate/spine-contracts/CapsuleSpineContract.v0': {
+            '#': {
+                startServer: {
+                    type: CapsulePropertyTypes.Function,
+                    value: function (this: any): string {
+                        return 'child-server'
+                    }
+                }
+            }
+        }
+    }, {
+        extendsCapsule: parentCapsule,
+        importMeta: import.meta,
+        importStack: makeImportStack(),
+        capsuleName: 'childCapsule'
+    })
+
+    const result = await run({}, async ({ apis }) => {
+        return {
+            // Direct call should use child's override
+            directStartServer: apis['childCapsule'].startServer(),
+            // Parent's hoist calling this.startServer() should also use child's override
+            hoist: apis['childCapsule'].hoist()
+        }
+    })
+
+    // Like class inheritance: child override should be called in both cases
+    expect(result as any).toEqual({
+        directStartServer: 'child-server',
+        hoist: 'hoisted: child-server'
+    })
+})
+
+
+it('scoped package URI resolves via filesystem convention walk-up when spineRoot is narrow', async function () {
+
+    // Use a NARROW spineFilesystemRoot (this test dir) — NOT the monorepo root.
+    // This simulates standalone-rt where spineRoot = package.json dir of the test.
+    //
+    // The capsule defined here (in @stream44.studio/encapsulate) maps a capsule from
+    // a DIFFERENT scope: @stream44.studio/encapsulate/tests/05-Extends/base-capsule
+    // (same scope — resolves via package.json name walk-up).
+    //
+    // The base-capsule then has its moduleFilepath set correctly, so any further
+    // resolutions from IT would use the fromPath walk-up.
+    //
+    // To truly test cross-scope resolution with narrow spineRoot, we verify that the
+    // resolve function's fromPath walk-up checks the scope/packages/pkg filesystem
+    // convention at each directory level (not just package.json name and node_modules).
+    //
+    // We use the commonSpineContractOpts.resolve function directly to test this.
+
+    const factory = await CapsuleSpineFactory({
+        spineFilesystemRoot: import.meta.dir,
+        staticAnalysisEnabled: false,
+        spineContracts: {
+            ['#' + CapsuleSpineContract['#']]: CapsuleSpineContract
+        }
+    })
+
+    const resolve = factory.commonSpineContractOpts.resolve
+
+    // This file is at: genesis/encapsulate.dev/packages/encapsulate/tests/05-Extends/main.test.ts
+    // With spineRoot = this dir, resolving a same-scope URI should work:
+    const sameScope = await resolve(
+        '@stream44.studio/encapsulate/tests/05-Extends/base-capsule',
+        join(import.meta.dir, 'main.test.ts')
+    )
+    expect(sameScope).toContain('base-capsule')
+
+    // Now test cross-scope: resolve @stream44.studio/t44-docker.com/caps/Container from this file.
+    // spineRoot is narrow (this dir), so spineRoot/t44.sh/packages/t44-docker.com/ doesn't exist.
+    // @stream44.studio/t44-docker.com is NOT in root node_modules either — it can only be found
+    // via the scope/packages/pkg filesystem convention: genesis/t44.sh/packages/t44-docker.com/
+    // The resolve must walk up from fromPath to find it using that convention.
+    const crossScope = await resolve(
+        '@stream44.studio/t44-docker.com/caps/Container',
+        join(import.meta.dir, 'main.test.ts')
+    )
+    expect(crossScope).toContain('t44.sh/packages/t44-docker.com/caps/Container')
 })

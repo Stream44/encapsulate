@@ -1,9 +1,9 @@
 
 import { describe, it, expect } from 'bun:test'
 import { join } from 'path'
-import { CapsuleSpineFactory } from "../../src/spine-factories/CapsuleSpineFactory.v0"
-import { CapsuleSpineContract } from "../../src/spine-contracts/CapsuleSpineContract.v0/Static.v0"
-import { CapsuleSpineContract as MembraneCapsuleSpineContract } from "../../src/spine-contracts/CapsuleSpineContract.v0/Membrane.v0"
+import { CapsuleSpineFactory } from "../../src/spine-factories/CapsuleSpineFactory"
+import { CapsuleSpineContract } from "../../src/spine-contracts/CapsuleSpineContract.v0/Static"
+import { CapsuleSpineContract as MembraneCapsuleSpineContract } from "../../src/spine-contracts/CapsuleSpineContract.v0/Membrane"
 
 
 it('Minimal construction & execution', async function () {

@@ -1,14 +1,14 @@
 
 import { describe, it, expect } from 'bun:test'
 import { join } from 'node:path'
-import { CapsuleSpineFactory } from "../../src/spine-factories/CapsuleSpineFactory.v0"
-import { CapsuleSpineContract } from "../../src/spine-contracts/CapsuleSpineContract.v0/Membrane.v0"
-import { CapsuleSpineContract as StaticCapsuleSpineContract } from "../../src/spine-contracts/CapsuleSpineContract.v0/Static.v0"
+import { CapsuleSpineFactory } from "../../src/spine-factories/CapsuleSpineFactory"
+import { CapsuleSpineContract } from "../../src/spine-contracts/CapsuleSpineContract.v0/Membrane"
+import { CapsuleSpineContract as StaticCapsuleSpineContract } from "../../src/spine-contracts/CapsuleSpineContract.v0/Static"
 
 
 for (const { label, Contract } of [
-    { label: 'Static.v0', Contract: StaticCapsuleSpineContract },
-    { label: 'Membrane.v0', Contract: CapsuleSpineContract },
+    { label: 'Static', Contract: StaticCapsuleSpineContract },
+    { label: 'Membrane', Contract: CapsuleSpineContract },
 ]) {
 
     describe(label, function () {

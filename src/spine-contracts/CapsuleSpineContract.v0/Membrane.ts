@@ -1,5 +1,5 @@
 import { CapsulePropertyTypes } from "../../encapsulate"
-import { ContractCapsuleInstanceFactory, CapsuleInstanceRegistry } from "./Static.v0"
+import { ContractCapsuleInstanceFactory, CapsuleInstanceRegistry } from "./Static"
 
 type CallerContext = {
     capsuleSourceLineRef: string
@@ -620,6 +620,86 @@ class MembraneContractCapsuleInstanceFactory extends ContractCapsuleInstanceFact
         })
     }
 
+    protected override mapProxyFunctionProperty({ property }: { property: any }) {
+        const selfProxy = this.createSelfProxy()
+
+        const childTargetFn = property.definition.value.target
+        const childInvokeFn = property.definition.value.invoke
+
+        // Inherit missing parts from parent's ProxyFunction (if extending)
+        const parentParts = this.self[`__proxyFn_${property.name}`]
+        const targetFn = childTargetFn ?? parentParts?.target
+        const invokeFn = childInvokeFn ?? parentParts?.invoke
+
+        if (!targetFn) throw new Error(`ProxyFunction '${property.name}': target() is required`)
+        if (!invokeFn) throw new Error(`ProxyFunction '${property.name}': invoke() is required`)
+
+        // Store parts for potential child override
+        this.self[`__proxyFn_${property.name}`] = { target: targetFn, invoke: invokeFn }
+
+        const boundProxyFn = (...args: any[]) => {
+            const transformedArgs = invokeFn.call(selfProxy, ...args)
+            const target = targetFn.call(selfProxy)
+            if (transformedArgs && typeof transformedArgs.then === 'function') {
+                return transformedArgs.then((resolved: any) => target(resolved))
+            }
+            return target(transformedArgs)
+        }
+
+        Object.defineProperty(this.encapsulatedApi, property.name, {
+            get: () => {
+                return (...args: any[]) => {
+                    const callEvent: any = {
+                        event: 'call',
+                        eventIndex: this.incrementEventIndex(),
+                        membrane: 'external',
+                        target: {
+                            capsuleSourceLineRef: this.encapsulateOptions.capsuleSourceLineRef,
+                            spineContractCapsuleInstanceId: this.id,
+                            prop: property.name,
+                        },
+                        args
+                    }
+
+                    if (this.capsuleSourceNameRef) {
+                        callEvent.target.capsuleSourceNameRef = this.capsuleSourceNameRef
+                    }
+                    if (this.capsuleSourceNameRefHash) {
+                        callEvent.target.capsuleSourceNameRefHash = this.capsuleSourceNameRefHash
+                    }
+                    if (this.capsuleInstance?.capsuleSourceUriLineRefInstanceId) {
+                        callEvent.target.capsuleSourceUriLineRefInstanceId = this.capsuleInstance.capsuleSourceUriLineRefInstanceId
+                    }
+
+                    this.addCallerContextToEvent(callEvent)
+                    this.onMembraneEvent?.(callEvent)
+
+                    const previousCallerContext = this.getCurrentCallerContext()
+                    this.setCurrentCallerContext(this.buildCallerContext(property.name))
+                    const result = boundProxyFn(...args)
+                    this.setCurrentCallerContext(previousCallerContext)
+
+                    const resultEvent: any = {
+                        event: 'call-result',
+                        eventIndex: this.incrementEventIndex(),
+                        membrane: 'external',
+                        callEventIndex: callEvent.eventIndex,
+                        target: {
+                            spineContractCapsuleInstanceId: this.id,
+                        },
+                        result
+                    }
+
+                    this.onMembraneEvent?.(resultEvent)
+
+                    return result
+                }
+            },
+            enumerable: true,
+            configurable: true
+        })
+    }
+
     protected mapGetterFunctionProperty({ property }: { property: any }) {
         const getterFn = property.definition.value
         const selfProxy = this.createSelfProxy()
@@ -749,22 +829,29 @@ class MembraneContractCapsuleInstanceFactory extends ContractCapsuleInstanceFact
                 }
 
                 // Determine the value source and get the value
+                // Virtual dispatch: child overrides take precedence over both
+                // self and own encapsulatedApi, matching class-inheritance semantics
                 let value: any
                 let source: 'self' | 'encapsulatedApi' | 'childApi' | 'extendedApi' | undefined
 
-                if (prop in target) {
-                    value = target[prop]
-                    source = 'self'
-                } else if (prop in factory.encapsulatedApi) {
-                    value = factory.encapsulatedApi[prop]
-                    source = 'encapsulatedApi'
-                } else if (factory.childEncapsulatedApis) {
+                // Check child capsule APIs first for virtual dispatch
+                if (factory.childEncapsulatedApis) {
                     for (const childApi of factory.childEncapsulatedApis) {
                         if (prop in childApi) {
                             value = childApi[prop]
                             source = 'childApi'
                             break
                         }
+                    }
+                }
+
+                if (source === undefined) {
+                    if (prop in target) {
+                        value = target[prop]
+                        source = 'self'
+                    } else if (prop in factory.encapsulatedApi) {
+                        value = factory.encapsulatedApi[prop]
+                        source = 'encapsulatedApi'
                     }
                 }
 

@@ -2,14 +2,14 @@
 import { describe, it, expect } from 'bun:test'
 import * as bunTest from 'bun:test'
 import { join } from 'path'
-import { CapsuleSpineFactory } from "../../src/spine-factories/CapsuleSpineFactory.v0"
-import { CapsuleSpineContract } from "../../src/spine-contracts/CapsuleSpineContract.v0/Membrane.v0"
-import { CapsuleSpineContract as StaticCapsuleSpineContract } from "../../src/spine-contracts/CapsuleSpineContract.v0/Static.v0"
+import { CapsuleSpineFactory } from "../../src/spine-factories/CapsuleSpineFactory"
+import { CapsuleSpineContract } from "../../src/spine-contracts/CapsuleSpineContract.v0/Membrane"
+import { CapsuleSpineContract as StaticCapsuleSpineContract } from "../../src/spine-contracts/CapsuleSpineContract.v0/Static"
 
 
 for (const { label, Contract } of [
-    { label: 'Static.v0', Contract: StaticCapsuleSpineContract },
-    { label: 'Membrane.v0', Contract: CapsuleSpineContract },
+    { label: 'Static', Contract: StaticCapsuleSpineContract },
+    { label: 'Membrane', Contract: CapsuleSpineContract },
 ]) {
 
     describe(label, function () {
@@ -837,6 +837,277 @@ for (const { label, Contract } of [
                 const api = apis[capsule1.capsuleSourceLineRef]
                 expect('onFreezeHandler' in api).toBe(false)
                 expect(api.name).toBe('test')
+            })
+        })
+
+
+        it('ProxyFunction wraps target function with argument transformation', async function () {
+
+            const { encapsulate, freeze, CapsulePropertyTypes, makeImportStack, hoistSnapshot } = await CapsuleSpineFactory({
+                spineFilesystemRoot: join(import.meta.dir, '../../../../..'),
+                capsuleModuleProjectionRoot: import.meta.dir,
+                enableCallerStackInference: true,
+                spineContracts: {
+                    ['#' + Contract['#']]: Contract
+                }
+            })
+
+            const targetCapsule = await encapsulate({
+                '#@stream44.studio/encapsulate/spine-contracts/CapsuleSpineContract.v0': {
+                    '#@stream44.studio/encapsulate/structs/Capsule': {},
+                    '#': {
+                        doWork: {
+                            type: CapsulePropertyTypes.Function,
+                            value: function (this: any, options: { message: string; prefix: string }): string {
+                                return `${options.prefix}:${options.message}`
+                            }
+                        }
+                    }
+                }
+            }, {
+                importMeta: import.meta,
+                importStack: makeImportStack(),
+                capsuleName: 'proxyTargetCapsule'
+            })
+
+            const proxyCapsule = await encapsulate({
+                '#@stream44.studio/encapsulate/spine-contracts/CapsuleSpineContract.v0': {
+                    '#@stream44.studio/encapsulate/structs/Capsule': {},
+                    '#': {
+                        defaultPrefix: {
+                            type: CapsulePropertyTypes.Literal,
+                            value: 'PROXY'
+                        },
+                        target: {
+                            type: CapsulePropertyTypes.Mapping,
+                            value: targetCapsule
+                        },
+                        work: {
+                            type: CapsulePropertyTypes.ProxyFunction,
+                            value: {
+                                target(this: any) {
+                                    return this.target.doWork
+                                },
+                                invoke(this: any, message: string) {
+                                    return {
+                                        message,
+                                        prefix: this.defaultPrefix,
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }, {
+                importMeta: import.meta,
+                importStack: makeImportStack(),
+                capsuleName: 'proxyFunctionCapsule',
+                ambientReferences: { targetCapsule }
+            })
+
+            const { run } = await hoistSnapshot({
+                snapshot: await freeze()
+            })
+
+            await run({}, async ({ apis }) => {
+                const api = apis[proxyCapsule.capsuleSourceLineRef]
+
+                // ProxyFunction should call invoke to transform args, then call target
+                const result = api.work('hello')
+                expect(result).toBe('PROXY:hello')
+
+                // Multiple calls should work
+                const result2 = api.work('world')
+                expect(result2).toBe('PROXY:world')
+            })
+        })
+
+
+        it('ProxyFunction with async target and invoke', async function () {
+
+            const { encapsulate, freeze, CapsulePropertyTypes, makeImportStack, hoistSnapshot } = await CapsuleSpineFactory({
+                spineFilesystemRoot: join(import.meta.dir, '../../../../..'),
+                capsuleModuleProjectionRoot: import.meta.dir,
+                enableCallerStackInference: true,
+                spineContracts: {
+                    ['#' + Contract['#']]: Contract
+                }
+            })
+
+            const serviceCapsule = await encapsulate({
+                '#@stream44.studio/encapsulate/spine-contracts/CapsuleSpineContract.v0': {
+                    '#@stream44.studio/encapsulate/structs/Capsule': {},
+                    '#': {
+                        fetchData: {
+                            type: CapsulePropertyTypes.Function,
+                            value: async function (this: any, options: { url: string; headers: Record<string, string> }): Promise<string> {
+                                return `fetched:${options.url}|host:${options.headers['Host']}`
+                            }
+                        }
+                    }
+                }
+            }, {
+                importMeta: import.meta,
+                importStack: makeImportStack(),
+                capsuleName: 'asyncProxyTargetCapsule'
+            })
+
+            const proxyCapsule = await encapsulate({
+                '#@stream44.studio/encapsulate/spine-contracts/CapsuleSpineContract.v0': {
+                    '#@stream44.studio/encapsulate/structs/Capsule': {},
+                    '#': {
+                        origin: {
+                            type: CapsulePropertyTypes.Literal,
+                            value: 'example.com'
+                        },
+                        service: {
+                            type: CapsulePropertyTypes.Mapping,
+                            value: serviceCapsule
+                        },
+                        fetch: {
+                            type: CapsulePropertyTypes.ProxyFunction,
+                            value: {
+                                target(this: any) {
+                                    return this.service.fetchData
+                                },
+                                async invoke(this: any, pathname: string) {
+                                    return {
+                                        url: `http://${this.origin}${pathname}`,
+                                        headers: { 'Host': this.origin }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }, {
+                importMeta: import.meta,
+                importStack: makeImportStack(),
+                capsuleName: 'asyncProxyFunctionCapsule',
+                ambientReferences: { serviceCapsule }
+            })
+
+            const { run } = await hoistSnapshot({
+                snapshot: await freeze()
+            })
+
+            await run({}, async ({ apis }) => {
+                const api = apis[proxyCapsule.capsuleSourceLineRef]
+
+                const result = await api.fetch('/api/data')
+                expect(result).toBe('fetched:http://example.com/api/data|host:example.com')
+            })
+        })
+
+
+        it('ProxyFunction partial override — child overrides target only, inherits invoke', async function () {
+
+            const { encapsulate, run, CapsulePropertyTypes, makeImportStack } = await CapsuleSpineFactory({
+                spineFilesystemRoot: join(import.meta.dir, '../../../../..'),
+                staticAnalysisEnabled: false,
+                spineContracts: {
+                    ['#' + Contract['#']]: Contract
+                }
+            })
+
+            // Parent target capsule — an in-process "server"
+            const inProcessService = await encapsulate({
+                '#@stream44.studio/encapsulate/spine-contracts/CapsuleSpineContract.v0': {
+                    '#@stream44.studio/encapsulate/structs/Capsule': {},
+                    '#': {
+                        handle: {
+                            type: CapsulePropertyTypes.Function,
+                            value: function (this: any, options: { url: string; headers: Record<string, string> }): string {
+                                return `in-process:${options.url}|host:${options.headers['Host']}`
+                            }
+                        }
+                    }
+                }
+            }, {
+                importMeta: import.meta,
+                importStack: makeImportStack(),
+                capsuleName: 'proxyOverrideInProcessService'
+            })
+
+            // Parent capsule with ProxyFunction (both target and invoke)
+            const parentCapsule = await encapsulate({
+                '#@stream44.studio/encapsulate/spine-contracts/CapsuleSpineContract.v0': {
+                    '#@stream44.studio/encapsulate/structs/Capsule': {},
+                    '#': {
+                        origin: {
+                            type: CapsulePropertyTypes.Literal,
+                            value: 'example.com'
+                        },
+                        service: {
+                            type: CapsulePropertyTypes.Mapping,
+                            value: inProcessService
+                        },
+                        fetch: {
+                            type: CapsulePropertyTypes.ProxyFunction,
+                            value: {
+                                target(this: any) {
+                                    return this.service.handle
+                                },
+                                invoke(this: any, pathname: string) {
+                                    return {
+                                        url: `http://${this.origin}${pathname}`,
+                                        headers: { 'Host': this.origin }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }, {
+                importMeta: import.meta,
+                importStack: makeImportStack(),
+                capsuleName: 'proxyOverrideParent'
+            })
+
+            // Child capsule — overrides ONLY target(), inherits invoke() from parent
+            // target() returns a direct function (like DockerServer doing direct HTTP)
+            const childCapsule = await encapsulate({
+                '#@stream44.studio/encapsulate/spine-contracts/CapsuleSpineContract.v0': {
+                    '#@stream44.studio/encapsulate/structs/Capsule': {},
+                    '#': {
+                        fetch: {
+                            type: CapsulePropertyTypes.ProxyFunction,
+                            value: {
+                                target() {
+                                    return function (options: { url: string; headers: Record<string, string> }): string {
+                                        return `docker:${options.url}|host:${options.headers['Host']}`
+                                    }
+                                }
+                                // invoke is omitted — inherited from parent
+                            }
+                        }
+                    }
+                }
+            }, {
+                extendsCapsule: parentCapsule,
+                importMeta: import.meta,
+                importStack: makeImportStack(),
+                capsuleName: 'proxyOverrideChild'
+            })
+
+            const result = await run({
+                overrides: {
+                    ['proxyOverrideChild']: {
+                        '#': {
+                            origin: 'example.com'
+                        }
+                    }
+                }
+            }, async ({ apis }) => {
+                const childApi = apis['proxyOverrideChild']
+
+                // Child should use docker target but parent's invoke (arg transformation)
+                const result = childApi.fetch('/api/data')
+                expect(result).toBe('docker:http://example.com/api/data|host:example.com')
+
+                // Verify parent's invoke is reused (origin comes from parent's invoke logic)
+                const result2 = childApi.fetch('/api/other')
+                expect(result2).toBe('docker:http://example.com/api/other|host:example.com')
             })
         })
 

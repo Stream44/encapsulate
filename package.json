@@ -10,9 +10,9 @@
     "type": "module",
     "exports": {
         "./encapsulate": "./src/encapsulate.ts",
-        "./spine-contracts/CapsuleSpineContract.v0/Static.v0": "./src/spine-contracts/CapsuleSpineContract.v0/Static.v0.ts",
-        "./spine-contracts/CapsuleSpineContract.v0/Membrane.v0": "./src/spine-contracts/CapsuleSpineContract.v0/Membrane.v0.ts",
-        "./spine-factories/CapsuleSpineFactory.v0": "./src/spine-factories/CapsuleSpineFactory.v0.ts",
+        "./spine-contracts/CapsuleSpineContract.v0/Static": "./src/spine-contracts/CapsuleSpineContract.v0/Static.ts",
+        "./spine-contracts/CapsuleSpineContract.v0/Membrane": "./src/spine-contracts/CapsuleSpineContract.v0/Membrane.ts",
+        "./spine-factories/CapsuleSpineFactory": "./src/spine-factories/CapsuleSpineFactory.ts",
         "./spine-factories/TimingObserver": "./src/spine-factories/TimingObserver.ts",
         "./structs/Capsule": "./structs/Capsule.ts",
         "./structs/CapsuleProjectionContext": "./structs/CapsuleProjectionContext.ts"

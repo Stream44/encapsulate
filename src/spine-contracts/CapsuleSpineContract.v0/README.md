@@ -263,6 +263,7 @@ All value types accept a `value` in their definition. `undefined` means "no defa
 | `Function` | `api.name(...args)` | `function(this, ...args)` | Callable method. Bound to self proxy. |
 | `GetterFunction` | `api.name` (no parens) | `function(this)` | Lazy getter. Evaluated on each access (unless memoized). |
 | `SetterFunction` | `api.name = value` | `function(this, value)` | Triggered on assignment. Enables validation/transformation logic. |
+| `ProxyFunction` | `api.name(...args)` | `{ target(this), invoke(this, ...args) }` | Wraps a target function with argument transformation. See below. |
 
 All function types are bound to a **self proxy** where:
 - `this.<prop>` resolves through: self → encapsulatedApi → extendedCapsuleApi
@@ -289,6 +290,31 @@ Applies to `Function` and `GetterFunction`. Added as a sibling to `type` and `va
 ```
 
 Memoize caches are scoped per spine contract capsule instance and cleared automatically when `run()` completes.
+
+#### ProxyFunction
+
+`ProxyFunction` wraps calling a target function with argument transformation. Its `value` is an object with two methods:
+
+- **`target(this)`** — resolves the function to call (bound to self proxy)
+- **`invoke(this, ...args)`** — transforms the caller's arguments before passing to target (bound to self proxy, may be async)
+
+```ts
+{
+    type: CapsulePropertyTypes.ProxyFunction,
+    value: {
+        target() { return this.service.fetchData },           // resolve target fn
+        async invoke(pathname: string) {                      // transform args
+            const origin = this.origin
+            return { url: `http://${origin}${pathname}`, headers: { Host: origin } }
+        }
+    }
+}
+```
+
+When `api.name(...args)` is called:
+1. `invoke(...args)` runs with self proxy as `this`, returning transformed args
+2. `target()` runs with self proxy as `this`, returning the function to call
+3. The target function is called with the transformed args (awaited if `invoke` returns a promise)
 
 ### Mapping
 
@@ -382,13 +408,13 @@ A capsule can inherit properties from a parent capsule:
 - `this.self` in a parent function returns the parent's own values (`ownSelf`), not the merged context.
 - Multiple capsules can extend the same parent — each gets a separate parent instance with its own `self`.
 
-### Spine Contracts: Static.v0 vs Membrane.v0
+### Spine Contracts: Static vs Membrane
 
 Both implement the same property mapping logic. The difference is observability.
 
-**Static.v0** — direct property assignment. No interception. Minimal overhead.
+**Static** — direct property assignment. No interception. Minimal overhead.
 
-**Membrane.v0** — wraps the API in proxies that emit events for every property access:
+**Membrane** — wraps the API in proxies that emit events for every property access:
 
 | Event | Emitted When | Payload |
 |---|---|---|
