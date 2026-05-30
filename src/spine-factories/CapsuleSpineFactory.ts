@@ -1,8 +1,10 @@
 import { join, dirname, relative, resolve as pathResolve } from 'path'
-import { writeFile, mkdir, readFile, stat } from 'fs/promises'
+import { writeFile, mkdir, readFile, stat, access } from 'fs/promises'
+import { createHash } from 'crypto'
 import { Spine, SpineRuntime, CapsulePropertyTypes, makeImportStack, merge } from "../encapsulate"
 import { StaticAnalyzer } from "../../src/static-analyzer"
 import { CapsuleModuleProjector } from "../../src/capsule-projectors/CapsuleModuleProjector"
+import { TimingObserver, type TimingObserverInterface } from "./TimingObserver"
 
 
 export { merge }
@@ -366,6 +368,31 @@ function createNpmUriForFilepath(): (filepath: string) => Promise<string | null>
     }
 }
 
+// Cross-factory cache for module imports — avoids re-importing the same file
+// across factory instances. The capsule() call still runs per-factory (spine-specific),
+// but the import() is only done once per filepath globally.
+const _moduleImportCache = new Map<string, Promise<any>>()
+
+// Cross-factory stat cache — avoids redundant filesystem stat() calls for the same
+// file across factory instances within a single process. Source file stats are cached
+// permanently (source files don't change within a single build). Cache file stats are
+// invalidated on write.
+const _statCache = new Map<string, Promise<{ mtime: Date } | null>>()
+function cachedStat(filepath: string): Promise<{ mtime: Date } | null> {
+    let cached = _statCache.get(filepath)
+    if (!cached) {
+        cached = stat(filepath).then(
+            s => ({ mtime: s.mtime }),
+            () => null
+        )
+        _statCache.set(filepath, cached)
+    }
+    return cached
+}
+function invalidateStatCache(filepath: string) {
+    _statCache.delete(filepath)
+}
+
 export async function CapsuleSpineFactory({
     spineFilesystemRoot,
     capsuleModuleProjectionRoot,
@@ -383,13 +410,16 @@ export async function CapsuleSpineFactory({
     onMembraneEvent?: (event: any) => void,
     enableCallerStackInference?: boolean,
     spineContracts: Record<string, any>,
-    timing?: { record: (step: string) => void, recordMajor: (step: string) => void, chalk?: any }
+    timing?: TimingObserverInterface | null
 }) {
 
     if (capsuleModuleProjectionRoot) capsuleModuleProjectionRoot = capsuleModuleProjectionRoot.replace(/^file:\/\//, '')
     if (spineFilesystemRoot) spineFilesystemRoot = spineFilesystemRoot.replace(/^file:\/\//, '')
 
-    const timing = timingParam
+    // Auto-create timing when ENCAPSULATE_TRACE env var is set
+    const timing: TimingObserverInterface | undefined = timingParam || (
+        process.env.ENCAPSULATE_TRACE ? TimingObserver() : undefined
+    )
 
     timing?.recordMajor('CAPSULE SPINE FACTORY: INITIALIZATION')
 
@@ -397,6 +427,7 @@ export async function CapsuleSpineFactory({
         const registry = new Map<string, Promise<any>>()
 
         return {
+            has(id: string) { return registry.has(id) },
             async ensure(id: string, createHandler: () => Promise<any>) {
                 if (!registry.has(id)) {
                     registry.set(id, createHandler())
@@ -419,6 +450,7 @@ export async function CapsuleSpineFactory({
     const sourceSpine: { encapsulate?: any } = {}
     const npmUriForFilepath = createNpmUriForFilepath()
     const commonSpineContractOpts = {
+        timing,
         spineFilesystemRoot,
         npmUriForFilepath,
         resolve: async (uri: string, parentFilepath: string) => {
@@ -430,24 +462,25 @@ export async function CapsuleSpineFactory({
             return await resolve(uri, parentFilepath, spineFilesystemRoot)
         },
         importCapsule: (() => {
-            return async (filepath: string) => {
+            const importFn = async (filepath: string) => {
                 const shortPath = filepath.replace(/^.*\/genesis\//, '')
 
                 timing?.record(`importCapsule: Called for ${shortPath}`)
                 const result = await registry.ensure(filepath, async () => {
                     timing?.recordMajor(`importCapsule: Starting import for ${shortPath}`)
                     const importStart = Date.now()
-                    const exports = await import(filepath)
+                    if (!_moduleImportCache.has(filepath)) {
+                        _moduleImportCache.set(filepath, import(filepath))
+                    }
+                    const exports = await _moduleImportCache.get(filepath)!
                     const importDuration = Date.now() - importStart
                     timing?.recordMajor(`importCapsule: import() took ${importDuration}ms for ${shortPath}`)
 
-                    if (importDuration > 10) {
-                        if (timing) {
-                            console.log(timing.chalk.red(`\n⚠️  WARNING: Slow module load detected!`))
-                            console.log(timing.chalk.red(`   Module: ${filepath}`))
-                            console.log(timing.chalk.red(`   Load time: ${importDuration}ms`))
-                            console.log(timing.chalk.red(`   Consider using dynamic imports to load heavy dependencies only when needed.\n`))
-                        }
+                    if (importDuration > 10 && timing) {
+                        console.log(timing.chalk.red(`\n⚠️  WARNING: Slow module load detected!`))
+                        console.log(timing.chalk.red(`   Module: ${filepath}`))
+                        console.log(timing.chalk.red(`   Load time: ${importDuration}ms`))
+                        console.log(timing.chalk.red(`   Consider using dynamic imports to load heavy dependencies only when needed.\n`))
                     }
 
                     if (typeof exports.capsule !== 'function') throw new Error(`Module at '${filepath}' does not export 'capsule'!`)
@@ -467,6 +500,7 @@ export async function CapsuleSpineFactory({
                 })
                 return result
             }
+            return importFn
         })(),
         encapsulateOpts: {
             CapsulePropertyTypes
@@ -570,10 +604,7 @@ export async function CapsuleSpineFactory({
 
     timing?.recordMajor('SPINE: INITIALIZATION')
 
-    let { encapsulate, freeze, capsules } = await Spine({
-        spineFilesystemRoot,
-        timing,
-        staticAnalyzer: staticAnalysisEnabled ? StaticAnalyzer({
+    const staticAnalyzer = staticAnalysisEnabled ? StaticAnalyzer({
             timing,
             cacheStore: {
                 writeFile: async (filepath: string, content: string) => {
@@ -581,6 +612,7 @@ export async function CapsuleSpineFactory({
                     const centralPath = join(spineFilesystemRoot, '.~o/encapsulate.dev/static-analysis', filepath)
                     await mkdir(dirname(centralPath), { recursive: true })
                     await writeFile(centralPath, content, 'utf-8')
+                    invalidateStatCache(centralPath)
                     // Also write to local project cache if available
                     if (capsuleModuleProjectionRoot) {
                         try {
@@ -604,29 +636,20 @@ export async function CapsuleSpineFactory({
                     return content
                 },
                 getStats: async (filepath: string) => {
-                    filepath = join(spineFilesystemRoot, '.~o/encapsulate.dev/static-analysis', filepath)
-                    try {
-                        const stats = await stat(filepath)
-                        return { mtime: stats.mtime }
-                    } catch (error) {
-                        // File doesn't exist
-                        return null
-                    }
+                    return cachedStat(join(spineFilesystemRoot, '.~o/encapsulate.dev/static-analysis', filepath))
                 },
             },
             spineStore: {
                 getStats: async (filepath: string) => {
-                    filepath = join(spineFilesystemRoot, filepath)
-                    try {
-                        const stats = await stat(filepath)
-                        return { mtime: stats.mtime }
-                    } catch (error) {
-                        // File doesn't exist
-                        return null
-                    }
+                    return cachedStat(join(spineFilesystemRoot, filepath))
                 },
             },
-        }) : undefined,
+        }) : undefined
+
+    let { encapsulate, freeze, capsules } = await Spine({
+        spineFilesystemRoot,
+        timing,
+        staticAnalyzer,
         spineContracts: spineContractInstances.encapsulation,
         projectionContext: capsuleModuleProjectionRoot ? {
             capsuleModuleProjectionPackage,
@@ -682,9 +705,15 @@ export async function CapsuleSpineFactory({
         return capsule
     }
 
+    // Track capsule refs known at freeze time so we can identify dynamic imports later
+    let frozenCapsuleRefs: Set<string> | null = null
+
     // Wrap freeze to also write spine instance (.sit.json) files
     const wrappedFreeze = async function () {
         const snapshot = await freeze()
+
+        // Record capsule refs at freeze time (before any dynamic imports)
+        frozenCapsuleRefs = new Set(Object.keys(capsules))
 
         // Write spine instance files if capsuleModuleProjectionRoot is available
         if (capsuleModuleProjectionRoot) {
@@ -722,6 +751,10 @@ export async function CapsuleSpineFactory({
                     }
                 }
 
+                // Check if any CSTs were regenerated — if not, we can skip SIT writes
+                // when existing files are still valid
+                const cstsChanged = !staticAnalyzer || staticAnalyzer.hasCacheMisses()
+
                 for (const [, capsule] of Object.entries(uniqueCapsules)) {
                     const cst = capsule.cst
                     const rootCapsuleName = cst?.source?.capsuleName
@@ -737,6 +770,16 @@ export async function CapsuleSpineFactory({
                     const sitDir = join(capsuleModuleProjectionRoot, '.~o/encapsulate.dev/spine-instances', dirName)
                     const sitFilePath = join(sitDir, `root-capsule.sit.json`)
 
+                    // Skip SIT generation if CSTs are unchanged and the file already exists
+                    if (!cstsChanged) {
+                        try {
+                            await access(sitFilePath)
+                            continue // File exists and no CSTs changed — skip
+                        } catch {
+                            // File doesn't exist — need to generate even though CSTs are cached
+                        }
+                    }
+
                     // Build the capsules map
                     const capsuleEntries: Record<string, { capsuleSourceUriLineRef: string }> = {}
                     for (const [, cap] of Object.entries(uniqueCapsules)) {
@@ -750,7 +793,7 @@ export async function CapsuleSpineFactory({
 
                     // Collect capsuleInstances from the cached root instance using an
                     // iterative stack — each instance stores its ID and parent ID from init
-                    const rootInstance = await capsule.makeInstance()
+                    const rootInstance = await capsule.makeInstance({ freezePhase: true })
                     const capsuleInstances: Record<string, { capsuleName: string, capsuleSourceUriLineRef: string, parentCapsuleSourceUriLineRefInstanceId: string }> = {}
 
                     // Iterative stack-based collection from instance tree
@@ -790,8 +833,18 @@ export async function CapsuleSpineFactory({
                         capsuleInstances
                     }
 
+                    const sitContent = JSON.stringify(sitData, null, 2)
+
+                    // Compare-before-write: skip disk write if content is identical
+                    try {
+                        const existing = await readFile(sitFilePath, 'utf-8')
+                        if (existing === sitContent) continue
+                    } catch {
+                        // File doesn't exist — write it
+                    }
+
                     await mkdir(sitDir, { recursive: true })
-                    await writeFile(sitFilePath, JSON.stringify(sitData, null, 2), 'utf-8')
+                    await writeFile(sitFilePath, sitContent, 'utf-8')
                 }
             } catch (error) {
                 // Spine instance file writing is best-effort
@@ -802,6 +855,55 @@ export async function CapsuleSpineFactory({
         return snapshot
     }
 
+    /**
+     * Write a dynamic SIT file capturing capsules that were loaded at runtime
+     * via importCapsule (not part of the static capsule tree).
+     * Call this after run() to record which dynamic capsules were used.
+     * The filename includes a content hash so unchanged combos produce the same file.
+     */
+    const writeDynamicSit = async function () {
+        if (!capsuleModuleProjectionRoot || !frozenCapsuleRefs) return
+
+        // Find capsules that were added after freeze (dynamic imports)
+        const dynamicCapsuleRefs: string[] = []
+        for (const key of Object.keys(capsules)) {
+            if (!frozenCapsuleRefs.has(key) && key.includes(':') && /:\d+$/.test(key)) {
+                dynamicCapsuleRefs.push(key)
+            }
+        }
+
+        if (dynamicCapsuleRefs.length === 0) return
+
+        // Build a sorted list of dynamic capsule entries for deterministic output
+        const dynamicEntries: Record<string, { capsuleSourceUriLineRef: string, capsuleName?: string }> = {}
+        for (const ref of dynamicCapsuleRefs.sort()) {
+            const cap = capsules[ref]
+            dynamicEntries[ref] = {
+                capsuleSourceUriLineRef: ref,
+                capsuleName: cap?.cst?.source?.capsuleName
+            }
+        }
+
+        const sitData = { dynamicCapsules: dynamicEntries }
+        const sitContent = JSON.stringify(sitData, null, 2)
+
+        // Content hash for the filename — same dynamic import combo = same file
+        const contentHash = createHash('sha256').update(sitContent).digest('hex').slice(0, 16)
+        const sitDir = join(capsuleModuleProjectionRoot, '.~o/encapsulate.dev/spine-instances')
+        const sitFilePath = join(sitDir, `dynamic-imports.${contentHash}.sit.json`)
+
+        // Skip write if file already exists (hash match = identical content)
+        try {
+            await access(sitFilePath)
+            return // Already exists with same content
+        } catch {
+            // File doesn't exist — write it
+        }
+
+        await mkdir(sitDir, { recursive: true })
+        await writeFile(sitFilePath, sitContent, 'utf-8')
+    }
+
     return {
         commonSpineContractOpts,
         CapsulePropertyTypes,
@@ -809,7 +911,9 @@ export async function CapsuleSpineFactory({
         encapsulate,
         run,
         freeze: wrappedFreeze,
+        writeDynamicSit,
         loadCapsule,
+        staticAnalyzer,
         spineContractInstances, // Expose for testing
         hoistSnapshot: async ({ snapshot }: { snapshot: any }) => {
 

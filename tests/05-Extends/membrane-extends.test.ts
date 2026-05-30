@@ -11,7 +11,7 @@ describe('Membrane: Inline capsule extends + mappings', () => {
 
         const { encapsulate, run, CapsulePropertyTypes, makeImportStack } = await CapsuleSpineFactory({
             spineFilesystemRoot: join(import.meta.dir, '../../../../..'),
-            staticAnalysisEnabled: false,
+            staticAnalysisEnabled: true,
             spineContracts: {
                 ['#' + CapsuleSpineContract['#']]: CapsuleSpineContract
             }
@@ -85,7 +85,7 @@ describe('Membrane: Inline capsule extends + mappings', () => {
 
         const { encapsulate, run, CapsulePropertyTypes, makeImportStack } = await CapsuleSpineFactory({
             spineFilesystemRoot: join(import.meta.dir, '../../../../..'),
-            staticAnalysisEnabled: false,
+            staticAnalysisEnabled: true,
             spineContracts: {
                 ['#' + CapsuleSpineContract['#']]: CapsuleSpineContract
             }
@@ -142,7 +142,7 @@ describe('Membrane: Inline capsule extends + mappings', () => {
 
         const { encapsulate, run, CapsulePropertyTypes, makeImportStack } = await CapsuleSpineFactory({
             spineFilesystemRoot: join(import.meta.dir, '../../../../..'),
-            staticAnalysisEnabled: false,
+            staticAnalysisEnabled: true,
             spineContracts: {
                 ['#' + CapsuleSpineContract['#']]: CapsuleSpineContract
             }

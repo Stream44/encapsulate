@@ -102,5 +102,101 @@ for (const { label, Contract } of [
                 expect(api.Config.Config.contextVar).toBe('contextVarValue')
             })
         })
+        it('Transitive overrides take precedence over intermediate capsule options', async function () {
+
+            const { encapsulate, freeze, CapsulePropertyTypes, makeImportStack, hoistSnapshot } = await CapsuleSpineFactory({
+                spineFilesystemRoot: join(import.meta.dir, '../../../../..'),
+                capsuleModuleProjectionRoot: import.meta.dir,
+                enableCallerStackInference: true,
+                spineContracts: {
+                    ['#' + Contract['#']]: Contract
+                }
+            })
+
+            // Leaf capsule with a name property (like ContainerContext)
+            const leafCapsule = await encapsulate({
+                '#@stream44.studio/encapsulate/spine-contracts/CapsuleSpineContract.v0': {
+                    '#@stream44.studio/encapsulate/structs/Capsule': {},
+                    '#': {
+                        name: {
+                            type: CapsulePropertyTypes.Literal,
+                            value: 'default-name',
+                        },
+                        port: {
+                            type: CapsulePropertyTypes.Literal,
+                            value: 0,
+                        },
+                    }
+                }
+            }, {
+                importMeta: import.meta,
+                importStack: makeImportStack(),
+                capsuleName: 'leaf',
+            })
+
+            // Middle capsule maps leaf with its OWN options that set defaults
+            // (like DatabaseServerDocker mapping ContainerContext)
+            const middleCapsule = await encapsulate({
+                '#@stream44.studio/encapsulate/spine-contracts/CapsuleSpineContract.v0': {
+                    '#@stream44.studio/encapsulate/structs/Capsule': {},
+                    '#': {
+                        inner: {
+                            type: CapsulePropertyTypes.Mapping,
+                            value: leafCapsule,
+                            options: {
+                                '#': {
+                                    name: 'middle-default',
+                                    port: 8080,
+                                }
+                            }
+                        },
+                    }
+                }
+            }, {
+                importMeta: import.meta,
+                importStack: makeImportStack(),
+                capsuleName: 'middle',
+                ambientReferences: { leafCapsule }
+            })
+
+            // Top capsule maps middle and provides transitive options
+            // targeting 'leaf' by capsule name — these should WIN over
+            // middle's own options for the leaf.
+            const topCapsule = await encapsulate({
+                '#@stream44.studio/encapsulate/spine-contracts/CapsuleSpineContract.v0': {
+                    '#@stream44.studio/encapsulate/structs/Capsule': {},
+                    '#': {
+                        outer: {
+                            type: CapsulePropertyTypes.Mapping,
+                            value: middleCapsule,
+                            options: {
+                                'leaf': {
+                                    '#': {
+                                        name: 'top-override',
+                                    }
+                                }
+                            }
+                        },
+                    }
+                }
+            }, {
+                importMeta: import.meta,
+                importStack: makeImportStack(),
+                capsuleName: 'top',
+                ambientReferences: { middleCapsule }
+            })
+
+            const { run } = await hoistSnapshot({
+                snapshot: await freeze()
+            })
+
+            await run({}, async ({ apis }) => {
+                const api = apis[topCapsule.capsuleSourceLineRef]
+                // Top's transitive override should win over middle's default
+                expect(api.outer.inner.name).toBe('top-override')
+                // Middle's port should still apply (not overridden by top)
+                expect(api.outer.inner.port).toBe(8080)
+            })
+        })
     })
 }

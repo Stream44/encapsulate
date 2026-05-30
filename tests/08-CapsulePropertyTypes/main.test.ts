@@ -1004,7 +1004,7 @@ for (const { label, Contract } of [
 
             const { encapsulate, run, CapsulePropertyTypes, makeImportStack } = await CapsuleSpineFactory({
                 spineFilesystemRoot: join(import.meta.dir, '../../../../..'),
-                staticAnalysisEnabled: false,
+                staticAnalysisEnabled: true,
                 spineContracts: {
                     ['#' + Contract['#']]: Contract
                 }
@@ -1087,7 +1087,8 @@ for (const { label, Contract } of [
                 extendsCapsule: parentCapsule,
                 importMeta: import.meta,
                 importStack: makeImportStack(),
-                capsuleName: 'proxyOverrideChild'
+                capsuleName: 'proxyOverrideChild',
+                ambientReferences: { parentCapsule }
             })
 
             const result = await run({
@@ -1108,6 +1109,151 @@ for (const { label, Contract } of [
                 // Verify parent's invoke is reused (origin comes from parent's invoke logic)
                 const result2 = childApi.fetch('/api/other')
                 expect(result2).toBe('docker:http://example.com/api/other|host:example.com')
+            })
+        })
+
+
+        it('ConstantGetterFunction evaluates eagerly and is available on the API', async function () {
+
+            const { encapsulate, freeze, CapsulePropertyTypes, makeImportStack, hoistSnapshot } = await CapsuleSpineFactory({
+                spineFilesystemRoot: join(import.meta.dir, '../../../../..'),
+                capsuleModuleProjectionRoot: import.meta.dir,
+                enableCallerStackInference: true,
+                spineContracts: {
+                    ['#' + Contract['#']]: Contract
+                }
+            })
+
+            const capsule1 = await encapsulate({
+                '#@stream44.studio/encapsulate/spine-contracts/CapsuleSpineContract.v0': {
+                    '#@stream44.studio/encapsulate/structs/Capsule': {},
+                    '#': {
+                        prefix: {
+                            type: CapsulePropertyTypes.Constant,
+                            value: 'hello',
+                        },
+                        suffix: {
+                            type: CapsulePropertyTypes.Literal,
+                            value: 'world',
+                        },
+                        // ConstantGetterFunction: evaluated eagerly during
+                        // property mapping, result stored as a plain value.
+                        // Receives { constants } — not bound to this.
+                        computed: {
+                            type: CapsulePropertyTypes.ConstantGetterFunction,
+                            value: function ({ constants }: any): string {
+                                return `${constants.prefix}-${constants.suffix}`
+                            }
+                        },
+                    }
+                }
+            }, {
+                importMeta: import.meta,
+                importStack: makeImportStack(),
+                capsuleName: 'constantGetterCapsule'
+            })
+
+            const { run } = await hoistSnapshot({
+                snapshot: await freeze()
+            })
+
+            await run({}, async ({ apis }: any) => {
+                const api = apis[capsule1.capsuleSourceLineRef]
+                expect(api.computed).toBe('hello-world')
+                expect(api.prefix).toBe('hello')
+                expect(api.suffix).toBe('world')
+            })
+        })
+
+
+        it('ConstantGetterFunction can access Capsule metadata', async function () {
+
+            const { encapsulate, freeze, CapsulePropertyTypes, makeImportStack, hoistSnapshot } = await CapsuleSpineFactory({
+                spineFilesystemRoot: join(import.meta.dir, '../../../../..'),
+                capsuleModuleProjectionRoot: import.meta.dir,
+                enableCallerStackInference: true,
+                spineContracts: {
+                    ['#' + Contract['#']]: Contract
+                }
+            })
+
+            const capsule1 = await encapsulate({
+                '#@stream44.studio/encapsulate/spine-contracts/CapsuleSpineContract.v0': {
+                    '#@stream44.studio/encapsulate/structs/Capsule': {},
+                    '#': {
+                        derivedName: {
+                            type: CapsulePropertyTypes.ConstantGetterFunction,
+                            value: function ({ constants }: any): string {
+                                return `derived:${constants['#@stream44.studio/encapsulate/structs/Capsule'].capsuleName}`
+                            }
+                        },
+                    }
+                }
+            }, {
+                importMeta: import.meta,
+                importStack: makeImportStack(),
+                capsuleName: 'cgetterMetadataCapsule'
+            })
+
+            const { run } = await hoistSnapshot({
+                snapshot: await freeze()
+            })
+
+            await run({}, async ({ apis }: any) => {
+                const api = apis[capsule1.capsuleSourceLineRef]
+                expect(api.derivedName).toBe('derived:cgetterMetadataCapsule')
+            })
+        })
+
+
+        it('ConstantGetterFunction result is accessible by other properties via this', async function () {
+
+            const { encapsulate, freeze, CapsulePropertyTypes, makeImportStack, hoistSnapshot } = await CapsuleSpineFactory({
+                spineFilesystemRoot: join(import.meta.dir, '../../../../..'),
+                capsuleModuleProjectionRoot: import.meta.dir,
+                enableCallerStackInference: true,
+                spineContracts: {
+                    ['#' + Contract['#']]: Contract
+                }
+            })
+
+            const capsule1 = await encapsulate({
+                '#@stream44.studio/encapsulate/spine-contracts/CapsuleSpineContract.v0': {
+                    '#@stream44.studio/encapsulate/structs/Capsule': {},
+                    '#': {
+                        base: {
+                            type: CapsulePropertyTypes.Constant,
+                            value: '/tmp/test',
+                        },
+                        derivedPath: {
+                            type: CapsulePropertyTypes.ConstantGetterFunction,
+                            value: function ({ constants }: any): string {
+                                return `${constants.base}/workbench`
+                            }
+                        },
+                        // A regular Function that reads the ConstantGetterFunction result
+                        getFullPath: {
+                            type: CapsulePropertyTypes.Function,
+                            value: function (this: any, name: string): string {
+                                return `${this.derivedPath}/${name}`
+                            }
+                        },
+                    }
+                }
+            }, {
+                importMeta: import.meta,
+                importStack: makeImportStack(),
+                capsuleName: 'cgetterAccessCapsule'
+            })
+
+            const { run } = await hoistSnapshot({
+                snapshot: await freeze()
+            })
+
+            await run({}, async ({ apis }: any) => {
+                const api = apis[capsule1.capsuleSourceLineRef]
+                expect(api.derivedPath).toBe('/tmp/test/workbench')
+                expect(api.getFullPath('data')).toBe('/tmp/test/workbench/data')
             })
         })
 

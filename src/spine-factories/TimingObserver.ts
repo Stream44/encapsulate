@@ -1,26 +1,36 @@
 
 import chalk from 'chalk';
 
-export function TimingObserver({ startTime }: { startTime: number }) {
-    let lastTime = startTime
+export type TimingOptions = { color?: 'red' | 'green' | 'yellow' | 'cyan' | 'gray' }
+
+export type TimingObserverInterface = {
+    record: (step: string, opts?: TimingOptions) => void,
+    recordMajor: (step: string, opts?: TimingOptions) => void,
+    chalk: typeof chalk,
+}
+
+export function TimingObserver(): TimingObserverInterface {
+    let lastTime = performance.now()
+
+    function format(msg: string, diff: string, opts?: TimingOptions): string {
+        const line = `[+${diff}ms] ${msg}`
+        if (opts?.color) return (chalk as any)[opts.color](line)
+        return line
+    }
 
     return {
         chalk,
-        record: (step: string) => {
-            const now = Date.now()
-            const diff = now - lastTime
+        record: (step: string, opts?: TimingOptions) => {
+            const now = performance.now()
+            const diff = (now - lastTime).toFixed(1)
             lastTime = now
-
-            const line = `[+${diff}ms]   ${step}`
-            console.log(diff > 10 ? chalk.red(line) : line)
+            console.log(format(`  ${step}`, diff, opts))
         },
-        recordMajor: (step: string) => {
-            const now = Date.now()
-            const diff = now - lastTime
+        recordMajor: (step: string, opts?: TimingOptions) => {
+            const now = performance.now()
+            const diff = (now - lastTime).toFixed(1)
             lastTime = now
-
-            const line = `[+${diff}ms] ${step}`
-            console.log(diff > 10 ? chalk.red(line) : chalk.cyan(line))
+            console.log(format(`★ ${step}`, diff, opts))
         }
     }
 }

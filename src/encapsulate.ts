@@ -1,4 +1,6 @@
 
+import type { TimingObserverInterface } from './spine-factories/TimingObserver'
+
 // CACHE_BUST_VERSION: Increment this whenever CST cache must be invalidated due to structural changes
 // This ensures projected capsules are regenerated when the CST format changes
 const CACHE_BUST_VERSION = 22
@@ -7,7 +9,7 @@ type TSpineOptions = {
     spineFilesystemRoot?: string,
     spineContracts: Record<string, any>,
     staticAnalyzer?: any,
-    timing?: { record: (step: string) => void, chalk?: any },
+    timing?: TimingObserverInterface,
     projectionContext?: {
         capsuleModuleProjectionPackage?: string,
         capsuleModuleProjectionRoot?: string,
@@ -56,6 +58,9 @@ type TCapsuleSnapshot = {
 type TCapsuleMakeInstanceOptions = {
     overrides?: Record<string, any>,
     options?: Record<string, any>,
+    /** Nested capsule-name-targeted options from a parent mapping.
+     *  Merged AFTER options so they take precedence over intermediate defaults. */
+    transitiveOverrides?: Record<string, any>,
     runtimeSpineContracts?: Record<string, any>,
     sharedSelf?: Record<string, any>,
     rootCapsule?: {
@@ -65,7 +70,8 @@ type TCapsuleMakeInstanceOptions = {
     },
     parentCapsuleSourceUriLineRefInstanceId?: string,
     sit?: { capsuleInstances: Record<string, { capsuleName: string, capsuleSourceUriLineRef: string, parentCapsuleSourceUriLineRefInstanceId: string }> },
-    skipCache?: boolean
+    skipCache?: boolean,
+    freezePhase?: boolean
 }
 
 type TCapsule = {
@@ -115,6 +121,7 @@ type TSpineContext = {
 export const CapsulePropertyTypes = {
     Function: 'Function' as const,
     GetterFunction: 'GetterFunction' as const,
+    ConstantGetterFunction: 'ConstantGetterFunction' as const,
     SetterFunction: 'SetterFunction' as const,
     String: 'String' as const,
     Mapping: 'Mapping' as const,
@@ -460,7 +467,7 @@ export async function Spine(options: TSpineOptions): Promise<TSpine> {
                     snapshot.capsules[capsule.cst.source.capsuleName] = snapshot.capsules[capsuleSourceLineRef]
                 }
 
-                const capsuleInstance = await capsule.makeInstance()
+                const capsuleInstance = await capsule.makeInstance({ freezePhase: true })
 
                 // Run OnFreeze functions so capsules can perform side effects
                 // (e.g. file projection) at build/freeze time
@@ -666,7 +673,9 @@ async function encapsulate(definition: TCapsuleDefinition, options: TCapsuleOpti
         encapsulateOptions,
         cst,
         crt: crts?.[capsuleSourceLineRef],
-        makeInstance: async ({ overrides = {}, options = {}, runtimeSpineContracts, sharedSelf, rootCapsule, parentCapsuleSourceUriLineRefInstanceId, sit, skipCache }: TCapsuleMakeInstanceOptions = {}) => {
+        makeInstance: async ({ overrides = {}, options = {}, transitiveOverrides, runtimeSpineContracts, sharedSelf, rootCapsule, parentCapsuleSourceUriLineRefInstanceId, sit, skipCache, freezePhase }: TCapsuleMakeInstanceOptions = {}) => {
+
+            spine.spineOptions.timing?.record(`makeInstance: ${capsuleName || capsuleSourceLineRef}${freezePhase ? ' [freeze]' : ''}${sharedSelf ? ' [extends]' : ''}`)
 
             // Create cache key based on parameters
             // When sharedSelf is provided, we must NOT cache because each extending capsule
@@ -674,15 +683,14 @@ async function encapsulate(definition: TCapsuleDefinition, options: TCapsuleOpti
             // This is critical for the pattern where multiple structs extend the same parent.
             // When skipCache is true (property contract delegates like structs/Capsule),
             // each parent capsule must get its own unique instance.
-            const cacheKey = (sharedSelf || skipCache) ? null : JSON.stringify({
-                overrides,
-                options,
-                hasRuntimeContracts: !!runtimeSpineContracts
-            })
+            const cacheKey = (sharedSelf || skipCache) ? null : computeCacheKey(
+                overrides, options, transitiveOverrides, !!runtimeSpineContracts
+            )
 
             // Check if we already have a pending or completed instance creation
             // Skip cache when sharedSelf is provided (cacheKey is null)
             if (cacheKey && instanceCache.has(cacheKey)) {
+                spine.spineOptions.timing?.record(`makeInstance: CACHE HIT ${capsuleName || capsuleSourceLineRef}`)
                 return instanceCache.get(cacheKey)!
             }
 
@@ -724,6 +732,7 @@ async function encapsulate(definition: TCapsuleDefinition, options: TCapsuleOpti
                                 const propDefTyped = propDef as Record<string, any>
                                 const aliasName = propDefTyped.as
                                 let delegateOptions = propDefTyped.options
+                                const delegateDepends = propDefTyped.depends
                                 const contractKey = aliasName || ('#' + propContractUri.substring(1))
 
                                 if (!propertyContractDefinitions[spineContractUri]['#']) {
@@ -739,6 +748,9 @@ async function encapsulate(definition: TCapsuleDefinition, options: TCapsuleOpti
                                     value: delegateCapsuleObj || delegateUri,
                                     propertyContractDelegate: propContractUri,
                                     as: aliasName,
+                                    // Forward depends from the struct declaration so the delegate
+                                    // options function can access the required parent properties
+                                    depends: delegateDepends,
                                     // Pass options from the property contract delegate to the mapped capsule
                                     delegateOptions
                                 }
@@ -775,12 +787,19 @@ async function encapsulate(definition: TCapsuleDefinition, options: TCapsuleOpti
                     }
                 }
 
-                // Merge in order: overrides by lineRef, overrides by name, options
+                // Merge in order: overrides, options, then transitive overrides.
+                // - Overrides (from run()) are general defaults — options are more specific.
+                // - Transitive overrides (nested capsule-name-targeted options from a parent)
+                //   are the most specific and win over intermediate capsule options.
                 mergeByContract(overrides?.[encapsulateOptions.capsuleSourceLineRef], 'Overrides')
                 if (encapsulateOptions.capsuleName) {
                     mergeByContract(overrides?.[encapsulateOptions.capsuleName], 'Overrides')
                 }
                 mergeByContract(options, 'Options')
+                mergeByContract(transitiveOverrides?.[encapsulateOptions.capsuleSourceLineRef], 'TransitiveOverrides')
+                if (encapsulateOptions.capsuleName) {
+                    mergeByContract(transitiveOverrides?.[encapsulateOptions.capsuleName], 'TransitiveOverrides')
+                }
 
                 // Extract default values from property definitions (Literal/String types)
                 // This ensures child capsule's default values are available before parent is instantiated
@@ -790,7 +809,8 @@ async function encapsulate(definition: TCapsuleDefinition, options: TCapsuleOpti
                         if (propertyContractUri !== '#') continue
                         for (const [propertyName, propertyDef] of Object.entries(properties as Record<string, any>)) {
                             if (propertyDef.type === CapsulePropertyTypes.Literal ||
-                                propertyDef.type === CapsulePropertyTypes.String) {
+                                propertyDef.type === CapsulePropertyTypes.String ||
+                                propertyDef.type === CapsulePropertyTypes.Constant) {
                                 if (propertyDef.value !== undefined) {
                                     defaultPropertyValues[propertyName] = propertyDef.value
                                 }
@@ -847,6 +867,7 @@ async function encapsulate(definition: TCapsuleDefinition, options: TCapsuleOpti
                     capsuleSourceLineRef: absoluteCapsuleSourceLineRef,
                     capsuleSourceNameRefHash: cst?.capsuleSourceNameRefHash,
                     moduleFilepath: originalAbsoluteModuleFilepath,
+                    spineFilesystemRoot: spine.spineOptions.spineFilesystemRoot,
                     // Root capsule metadata will be populated after extends chain is resolved
                     rootCapsule: {
                         capsuleName: undefined as string | undefined,
@@ -926,9 +947,11 @@ async function encapsulate(definition: TCapsuleDefinition, options: TCapsuleOpti
                         })
                     }
 
+                    spine.spineOptions.timing?.record(`makeInstance: extends → ${extendsCapsule.encapsulateOptions?.capsuleName || '?'}`)
                     extendedCapsuleInstance = await extendsCapsule.makeInstance({
                         overrides,
                         options,
+                        transitiveOverrides,
                         runtimeSpineContracts,
                         sharedSelf: self,
                         rootCapsule: rootCapsule || {
@@ -937,9 +960,10 @@ async function encapsulate(definition: TCapsuleDefinition, options: TCapsuleOpti
                             moduleFilepath: absoluteModuleFilepath
                         },
                         parentCapsuleSourceUriLineRefInstanceId: parentCapsuleSourceUriLineRefInstanceId
-                            ? await sha256(parentCapsuleSourceUriLineRefInstanceId + ':' + (cst?.capsuleSourceUriLineRef || encapsulateOptions.capsuleSourceLineRef))
-                            : await sha256(cst?.capsuleSourceUriLineRef || encapsulateOptions.capsuleSourceLineRef),
-                        sit
+                            ? sha256(parentCapsuleSourceUriLineRefInstanceId + ':' + (cst?.capsuleSourceUriLineRef || encapsulateOptions.capsuleSourceLineRef))
+                            : sha256(cst?.capsuleSourceUriLineRef || encapsulateOptions.capsuleSourceLineRef),
+                        sit,
+                        freezePhase
                     })
 
                     // Propagate this (child) capsule's encapsulatedApi to all parent spine contract
@@ -975,8 +999,8 @@ async function encapsulate(definition: TCapsuleDefinition, options: TCapsuleOpti
                 //   child: sha256(parentCapsuleSourceUriLineRefInstanceId + ":" + capsuleSourceUriLineRef)
                 const capsuleSourceUriLineRef = cst?.capsuleSourceUriLineRef || encapsulateOptions.capsuleSourceLineRef
                 const capsuleSourceUriLineRefInstanceId = parentCapsuleSourceUriLineRefInstanceId
-                    ? await sha256(parentCapsuleSourceUriLineRefInstanceId + ':' + capsuleSourceUriLineRef)
-                    : await sha256(capsuleSourceUriLineRef)
+                    ? sha256(parentCapsuleSourceUriLineRefInstanceId + ':' + capsuleSourceUriLineRef)
+                    : sha256(capsuleSourceUriLineRef)
 
                 // Register this instance in the sit structure if provided
                 if (sit) {
@@ -1001,7 +1025,8 @@ async function encapsulate(definition: TCapsuleDefinition, options: TCapsuleOpti
                     capsuleSourceUriLineRefInstanceId,
                     capsuleName: encapsulateOptions.capsuleName,
                     capsuleSourceUriLineRef,
-                    sit
+                    sit,
+                    freezePhase
                 }
 
                 // Set capsule metadata struct on self early so it's available in options() callbacks during mapping
@@ -1011,6 +1036,14 @@ async function encapsulate(definition: TCapsuleDefinition, options: TCapsuleOpti
                     self['#@stream44.studio/encapsulate/structs/Capsule'] = capsuleMetadataStruct
                 }
                 ownSelf['#@stream44.studio/encapsulate/structs/Capsule'] = capsuleMetadataStruct
+
+                // Promote metadata values to top-level self properties so struct delegate
+                // proxies (which read from the capsule instance's own self/api) can access them.
+                for (const [metaKey, metaValue] of Object.entries(capsuleMetadataStruct)) {
+                    if (metaKey !== 'rootCapsule' && metaValue !== undefined && self[metaKey] === undefined) {
+                        self[metaKey] = metaValue
+                    }
+                }
 
                 // Use runtime spine contracts if provided, otherwise fall back to encapsulation spine contracts
                 const activeSpineContracts = runtimeSpineContracts || spine.spineContracts
@@ -1056,6 +1089,7 @@ async function encapsulate(definition: TCapsuleDefinition, options: TCapsuleOpti
                             await spineContractCapsuleInstance.mapProperty({
                                 overrides,
                                 options,
+                                transitiveOverrides,
                                 property: {
                                     name: propertyName,
                                     definition: propertyDefinition,
@@ -1230,15 +1264,41 @@ function relative(from: string, to: string): string {
     return result || '.'
 }
 
-async function sha256(input: string): Promise<string> {
-    const data = new TextEncoder().encode(input)
-    const hashBuffer = await crypto.subtle.digest('SHA-256', data)
-    const hashArray = new Uint8Array(hashBuffer)
-    let hex = ''
-    for (let i = 0; i < hashArray.length; i++) {
-        hex += hashArray[i].toString(16).padStart(2, '0')
+// Fast cache key computation for makeInstance — avoids JSON.stringify for the common empty case
+const _emptyObj = {}
+const _cacheKeyEmpty = '{"overrides":{},"options":{},"hasRuntimeContracts":false}'
+const _cacheKeyEmptyWithRuntime = '{"overrides":{},"options":{},"hasRuntimeContracts":true}'
+function _isEmptyObj(obj: any): boolean { for (const _ in obj) return false; return true }
+const _cacheKeyLastRef = { overrides: _emptyObj as any, options: _emptyObj as any, transitiveOverrides: undefined as any, hasRuntime: false, key: _cacheKeyEmpty }
+function computeCacheKey(overrides: any, options: any, transitiveOverrides: any, hasRuntimeContracts: boolean): string {
+    // Reference-equality shortcut: if same objects as last call, reuse key
+    if (overrides === _cacheKeyLastRef.overrides && options === _cacheKeyLastRef.options
+        && transitiveOverrides === _cacheKeyLastRef.transitiveOverrides && hasRuntimeContracts === _cacheKeyLastRef.hasRuntime) {
+        return _cacheKeyLastRef.key
     }
-    return hex
+    // Fast-path: empty overrides + empty options + no transitive = constant string
+    if (!transitiveOverrides && _isEmptyObj(overrides) && _isEmptyObj(options)) {
+        const key = hasRuntimeContracts ? _cacheKeyEmptyWithRuntime : _cacheKeyEmpty
+        _cacheKeyLastRef.overrides = overrides; _cacheKeyLastRef.options = options
+        _cacheKeyLastRef.transitiveOverrides = transitiveOverrides; _cacheKeyLastRef.hasRuntime = hasRuntimeContracts
+        _cacheKeyLastRef.key = key
+        return key
+    }
+    const key = JSON.stringify({ overrides, options, transitiveOverrides, hasRuntimeContracts })
+    _cacheKeyLastRef.overrides = overrides; _cacheKeyLastRef.options = options
+    _cacheKeyLastRef.transitiveOverrides = transitiveOverrides; _cacheKeyLastRef.hasRuntime = hasRuntimeContracts
+    _cacheKeyLastRef.key = key
+    return key
+}
+
+const _sha256Cache = new Map<string, string>()
+const _createHash = require('crypto').createHash
+function sha256(input: string): string {
+    let result = _sha256Cache.get(input)
+    if (result !== undefined) return result
+    result = _createHash('sha256').update(input).digest('hex') as string
+    _sha256Cache.set(input, result)
+    return result
 }
 
 function isObject(item: any): boolean {

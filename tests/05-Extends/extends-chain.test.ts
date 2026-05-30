@@ -10,7 +10,7 @@ describe('3-level extends chain: parent function calls child function via this',
 
         const { encapsulate, run, CapsulePropertyTypes, makeImportStack } = await CapsuleSpineFactory({
             spineFilesystemRoot: join(import.meta.dir, '../../../../..'),
-            staticAnalysisEnabled: false,
+            staticAnalysisEnabled: true,
             spineContracts: {
                 ['#' + CapsuleSpineContract['#']]: CapsuleSpineContract
             }
@@ -51,7 +51,8 @@ describe('3-level extends chain: parent function calls child function via this',
             extendsCapsule: parentCapsule,
             importMeta: import.meta,
             importStack: makeImportStack(),
-            capsuleName: 'childCapsule'
+            capsuleName: 'childCapsule',
+            ambientReferences: { parentCapsule }
         })
 
         const result = await run({}, async ({ apis }) => {
@@ -65,7 +66,7 @@ describe('3-level extends chain: parent function calls child function via this',
 
         const { encapsulate, run, CapsulePropertyTypes, makeImportStack } = await CapsuleSpineFactory({
             spineFilesystemRoot: join(import.meta.dir, '../../../../..'),
-            staticAnalysisEnabled: false,
+            staticAnalysisEnabled: true,
             spineContracts: {
                 ['#' + CapsuleSpineContract['#']]: CapsuleSpineContract
             }
@@ -126,7 +127,8 @@ describe('3-level extends chain: parent function calls child function via this',
             extendsCapsule: engine,
             importMeta: import.meta,
             importStack: makeImportStack(),
-            capsuleName: 'queryAPI'
+            capsuleName: 'queryAPI',
+            ambientReferences: { engine }
         })
 
         // Leaf child (ImportAPI): uses public API from engine which delegates to queryAPI
@@ -149,7 +151,8 @@ describe('3-level extends chain: parent function calls child function via this',
             extendsCapsule: queryAPI,
             importMeta: import.meta,
             importStack: makeImportStack(),
-            capsuleName: 'importAPI'
+            capsuleName: 'importAPI',
+            ambientReferences: { queryAPI }
         })
 
         const result = await run({}, async ({ apis }) => {
@@ -179,7 +182,7 @@ describe('3-level extends chain: parent function calls child function via this',
 
         const { encapsulate, run, CapsulePropertyTypes, makeImportStack } = await CapsuleSpineFactory({
             spineFilesystemRoot: join(import.meta.dir, '../../../../..'),
-            staticAnalysisEnabled: false,
+            staticAnalysisEnabled: true,
             spineContracts: {
                 ['#' + CapsuleSpineContract['#']]: CapsuleSpineContract
             }
@@ -219,7 +222,8 @@ describe('3-level extends chain: parent function calls child function via this',
             extendsCapsule: top,
             importMeta: import.meta,
             importStack: makeImportStack(),
-            capsuleName: 'middle'
+            capsuleName: 'middle',
+            ambientReferences: { top }
         })
 
         // Bottom: implements _format
@@ -238,7 +242,8 @@ describe('3-level extends chain: parent function calls child function via this',
             extendsCapsule: middle,
             importMeta: import.meta,
             importStack: makeImportStack(),
-            capsuleName: 'bottom'
+            capsuleName: 'bottom',
+            ambientReferences: { middle }
         })
 
         const result = await run({}, async ({ apis }) => {
@@ -252,7 +257,7 @@ describe('3-level extends chain: parent function calls child function via this',
 
         const { encapsulate, run, CapsulePropertyTypes, makeImportStack } = await CapsuleSpineFactory({
             spineFilesystemRoot: join(import.meta.dir, '../../../../..'),
-            staticAnalysisEnabled: false,
+            staticAnalysisEnabled: true,
             spineContracts: {
                 ['#' + CapsuleSpineContract['#']]: CapsuleSpineContract
             }
@@ -298,7 +303,8 @@ describe('3-level extends chain: parent function calls child function via this',
             extendsCapsule: modelQueryMethods,
             importMeta: import.meta,
             importStack: makeImportStack(),
-            capsuleName: 'engine'
+            capsuleName: 'engine',
+            ambientReferences: { modelQueryMethods }
         })
 
         // Level 3 (QueryAPI): extends Engine, implements _-prefixed query+mutation methods
@@ -334,7 +340,8 @@ describe('3-level extends chain: parent function calls child function via this',
             extendsCapsule: engine,
             importMeta: import.meta,
             importStack: makeImportStack(),
-            capsuleName: 'queryAPI'
+            capsuleName: 'queryAPI',
+            ambientReferences: { engine }
         })
 
         // Level 4 (ImportAPI): extends QueryAPI, uses public API from all levels
@@ -359,7 +366,8 @@ describe('3-level extends chain: parent function calls child function via this',
             extendsCapsule: queryAPI,
             importMeta: import.meta,
             importStack: makeImportStack(),
-            capsuleName: 'importAPI'
+            capsuleName: 'importAPI',
+            ambientReferences: { queryAPI }
         })
 
         const result = await run({}, async ({ apis }) => {

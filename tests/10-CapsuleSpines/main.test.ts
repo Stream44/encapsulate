@@ -149,7 +149,7 @@ describe('CapsuleSpine Linking Features', () => {
         expect(sitContent.capsules['@stream44.studio/encapsulate/tests/10-CapsuleSpines/comprehensiveLinking'].capsuleSourceUriLineRef)
             .toMatch(/^@stream44\.studio\/encapsulate\/tests\/10-CapsuleSpines\/main\.test:\d+$/)
         expect(sitContent.capsules['@stream44.studio/encapsulate/structs/Capsule'].capsuleSourceUriLineRef)
-            .toBe('@stream44.studio/encapsulate/structs/Capsule:18')
+            .toBe('@stream44.studio/encapsulate/structs/Capsule:23')
 
         // Verify rootCapsule has capsuleSourceUriLineRefInstanceId
         expect(sitContent.rootCapsule.capsuleSourceUriLineRefInstanceId).toMatch(/^[0-9a-f]{64}$/)
@@ -321,7 +321,7 @@ describe('CapsuleSpine Linking Features', () => {
         const cstKey = Object.keys(cstContent)[0]
         const cst = cstContent[cstKey]
 
-        expect(cst.capsuleSourceUriLineRef).toBe('@stream44.studio/encapsulate/structs/Capsule:18')
+        expect(cst.capsuleSourceUriLineRef).toBe('@stream44.studio/encapsulate/structs/Capsule:23')
         expect(cst.source.capsuleName).toBe('@stream44.studio/encapsulate/structs/Capsule')
         expect(cst.source.moduleFilepath).toContain('structs/Capsule.ts')
         expect(cst.spineContracts).toBeDefined()

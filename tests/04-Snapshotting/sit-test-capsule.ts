@@ -6,15 +6,11 @@ export async function capsule({
 }: any) {
     return encapsulate({
         '#@stream44.studio/encapsulate/spine-contracts/CapsuleSpineContract.v0': {
+            '#@stream44.studio/encapsulate/structs/Capsule': {},
             '#': {
-                capsuleSourceNameRefHash: {
+                value: {
                     type: CapsulePropertyTypes.Literal,
-                    value: undefined
-                },
-
-                spineFilesystemRoot: {
-                    type: CapsulePropertyTypes.Literal,
-                    value: undefined as string | undefined
+                    value: 'sit-test',
                 },
             }
         }
@@ -24,4 +20,4 @@ export async function capsule({
         capsuleName: capsule['#'],
     })
 }
-capsule['#'] = '@stream44.studio/encapsulate/structs/Capsule'
+capsule['#'] = '@test/sit-test-capsule'

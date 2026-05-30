@@ -1,4 +1,5 @@
 import { CapsulePropertyTypes, join } from "../../encapsulate"
+import type { TimingObserverInterface } from "../../spine-factories/TimingObserver"
 
 // Type for capsule instance registry - scoped per spine contract instance
 export type CapsuleInstanceRegistry = Map<string, any>
@@ -19,6 +20,7 @@ export class ContractCapsuleInstanceFactory {
     public childEncapsulatedApis?: Record<string, any>[]
     protected runtimeSpineContracts?: Record<string, any>
     protected capsuleInstance?: any
+    protected timing?: TimingObserverInterface
     public structInitFunctions: Array<() => any> = []
     public structDisposeFunctions: Array<() => any> = []
     public initFunctions: Array<() => any> = []
@@ -28,7 +30,7 @@ export class ContractCapsuleInstanceFactory {
     protected memoizeCache: Map<string, any> = new Map()
     protected memoizeTimeouts: Map<string, ReturnType<typeof setTimeout>> = new Map()
 
-    constructor({ spineContractUri, capsule, self, ownSelf, encapsulatedApi, resolve, importCapsule, spineFilesystemRoot, freezeCapsule, instanceRegistry, extendedCapsuleInstance, runtimeSpineContracts, capsuleInstance }: { spineContractUri: string, capsule: any, self: any, ownSelf?: any, encapsulatedApi: Record<string, any>, resolve?: (uri: string, parentFilepath: string) => Promise<string>, importCapsule?: (filepath: string) => Promise<any>, spineFilesystemRoot?: string, freezeCapsule?: (capsule: any) => Promise<any>, instanceRegistry?: CapsuleInstanceRegistry, extendedCapsuleInstance?: any, runtimeSpineContracts?: Record<string, any>, capsuleInstance?: any }) {
+    constructor({ spineContractUri, capsule, self, ownSelf, encapsulatedApi, resolve, importCapsule, spineFilesystemRoot, freezeCapsule, instanceRegistry, extendedCapsuleInstance, runtimeSpineContracts, capsuleInstance, timing }: { spineContractUri: string, capsule: any, self: any, ownSelf?: any, encapsulatedApi: Record<string, any>, resolve?: (uri: string, parentFilepath: string) => Promise<string>, importCapsule?: (filepath: string) => Promise<any>, spineFilesystemRoot?: string, freezeCapsule?: (capsule: any) => Promise<any>, instanceRegistry?: CapsuleInstanceRegistry, extendedCapsuleInstance?: any, runtimeSpineContracts?: Record<string, any>, capsuleInstance?: any, timing?: TimingObserverInterface }) {
         this.spineContractUri = spineContractUri
         this.capsule = capsule
         this.self = self
@@ -42,6 +44,7 @@ export class ContractCapsuleInstanceFactory {
         this.extendedCapsuleInstance = extendedCapsuleInstance
         this.runtimeSpineContracts = runtimeSpineContracts
         this.capsuleInstance = capsuleInstance
+        this.timing = timing
 
         // Inject importCapsule onto ownSelf so capsule functions can call this.self.importCapsule()
         if (ownSelf && !ownSelf.importCapsule) {
@@ -82,9 +85,9 @@ export class ContractCapsuleInstanceFactory {
         }
     }
 
-    async mapProperty({ overrides, options, property }: { overrides: any, options: any, property: any }) {
+    async mapProperty({ overrides, options, transitiveOverrides, property }: { overrides: any, options: any, transitiveOverrides?: any, property: any }) {
         if (property.definition.type === CapsulePropertyTypes.Mapping) {
-            await this.mapMappingProperty({ overrides, options, property })
+            await this.mapMappingProperty({ overrides, options, transitiveOverrides, property })
         } else if (
             property.definition.type === CapsulePropertyTypes.String ||
             property.definition.type === CapsulePropertyTypes.Literal ||
@@ -93,6 +96,8 @@ export class ContractCapsuleInstanceFactory {
             this.mapLiteralProperty({ property })
         } else if (property.definition.type === CapsulePropertyTypes.Function) {
             this.mapFunctionProperty({ property })
+        } else if (property.definition.type === CapsulePropertyTypes.ConstantGetterFunction) {
+            this.mapConstantGetterFunctionProperty({ property })
         } else if (property.definition.type === CapsulePropertyTypes.GetterFunction) {
             this.mapGetterFunctionProperty({ property })
         } else if (property.definition.type === CapsulePropertyTypes.SetterFunction) {
@@ -206,6 +211,7 @@ export class ContractCapsuleInstanceFactory {
                     throw resolveError
                 }
             }
+            this.timing?.record(`resolveMappedCapsule: importCapsule(${filepath.replace(/^.*\/genesis\//, '')})`)
             mappedCapsule = await this.importCapsule(filepath)
         } else if (
             typeof property.definition.value === 'object' &&
@@ -219,8 +225,10 @@ export class ContractCapsuleInstanceFactory {
         return mappedCapsule
     }
 
-    protected async extractConstants({ mappedCapsule }: { mappedCapsule: any }) {
+    protected async extractConstants({ mappedCapsule, _visited }: { mappedCapsule: any, _visited?: Set<string> }) {
         const constants: Record<string, any> = {}
+        const constantGetterFunctions: Array<{ key: string; fn: Function }> = []
+        const mappingProperties: Array<{ key: string; def: any }> = []
 
         const spineContractDef = mappedCapsule.definition[this.spineContractUri]
 
@@ -239,9 +247,14 @@ export class ContractCapsuleInstanceFactory {
 
                     if (
                         type === CapsulePropertyTypes.String ||
-                        type === CapsulePropertyTypes.Literal
+                        type === CapsulePropertyTypes.Literal ||
+                        type === CapsulePropertyTypes.Constant
                     ) {
                         constants[prop] = propValue
+                    } else if (type === CapsulePropertyTypes.ConstantGetterFunction) {
+                        constantGetterFunctions.push({ key: prop, fn: propValue })
+                    } else if (type === CapsulePropertyTypes.Mapping) {
+                        mappingProperties.push({ key: prop, def: propDef })
                     }
                 }
             } else {
@@ -252,17 +265,67 @@ export class ContractCapsuleInstanceFactory {
 
                 if (
                     type === CapsulePropertyTypes.String ||
-                    type === CapsulePropertyTypes.Literal
+                    type === CapsulePropertyTypes.Literal ||
+                    type === CapsulePropertyTypes.Constant
                 ) {
                     constants[key] = propValue
+                } else if (type === CapsulePropertyTypes.ConstantGetterFunction) {
+                    constantGetterFunctions.push({ key, fn: propValue })
+                } else if (type === CapsulePropertyTypes.Mapping) {
+                    mappingProperties.push({ key, def: value })
                 }
             }
+        }
+
+        // Resolve Mapping properties and extract their constants recursively.
+        // Track visited capsules to prevent infinite recursion on circular refs.
+        const visited = _visited || new Set<string>()
+        const thisCapsuleName = mappedCapsule.encapsulateOptions?.capsuleName
+        if (thisCapsuleName) visited.add(thisCapsuleName)
+        for (const { key, def } of mappingProperties) {
+            try {
+                const nestedCapsule = await this.resolveMappedCapsule({
+                    property: { definition: def, name: key }
+                })
+                const nestedName = nestedCapsule.encapsulateOptions?.capsuleName
+                if (nestedName && visited.has(nestedName)) continue
+                constants[key] = await this.extractConstants({ mappedCapsule: nestedCapsule, _visited: visited })
+            } catch {
+                // Skip mappings that cannot be resolved (e.g. missing dependencies)
+            }
+        }
+
+        // Build capsule metadata so ConstantGetterFunctions can access it.
+        // rootCapsule is inherited from the parent (same as what makeInstance would receive).
+        const capsuleStructKey = '#@stream44.studio/encapsulate/structs/Capsule'
+        const relModuleFilepath = mappedCapsule.cst?.source?.moduleFilepath
+            || mappedCapsule.encapsulateOptions?.moduleFilepath
+        const moduleFilepath = relModuleFilepath
+            ? (relModuleFilepath.startsWith('/')
+                ? relModuleFilepath
+                : join(this.spineFilesystemRoot || '', relModuleFilepath))
+            : undefined
+        constants[capsuleStructKey] = {
+            capsuleName: mappedCapsule.encapsulateOptions?.capsuleName,
+            moduleFilepath,
+            rootCapsule: this.capsuleInstance?.rootCapsule || {
+                capsuleName: this.capsule?.encapsulateOptions?.capsuleName,
+                moduleFilepath: this.self?.[capsuleStructKey]?.moduleFilepath,
+            },
+        }
+
+        // Evaluate ConstantGetterFunction values with the accumulated constants
+        // (including resolved Mapping constants). These receive { constants }
+        // (not this) — only static values and nested Mapping constants are available.
+        for (const { key, fn } of constantGetterFunctions) {
+            constants[key] = fn({ constants })
         }
 
         return constants
     }
 
-    protected async mapMappingProperty({ overrides, options, property }: { overrides: any, options: any, property: any }) {
+    protected async mapMappingProperty({ overrides, options, transitiveOverrides, property }: { overrides: any, options: any, transitiveOverrides?: any, property: any }) {
+        this.timing?.record(`mapMappingProperty: ${property.name} → ${typeof property.definition.value === 'string' ? property.definition.value : (property.definition.value?.encapsulateOptions?.capsuleName || 'obj')}`)
         const mappedCapsule = await this.resolveMappedCapsule({ property })
         const constants = await this.extractConstants({ mappedCapsule })
 
@@ -275,9 +338,25 @@ export class ContractCapsuleInstanceFactory {
         const minimalSelf = this.self[capsuleStructKey]
             ? { [capsuleStructKey]: this.self[capsuleStructKey] }
             : {}
-        const mappingOptions = property.definition.delegateOptions
-            || (typeof optionsFn === 'function'
-                ? await optionsFn({ self: property.definition.depends ? this.self : minimalSelf, constants })
+        // During freeze phase, skip calling function-based options callbacks — runtime
+        // overrides haven't been applied so self.* references may be incomplete.
+        // Use a truthy placeholder so the instance registry still creates a fresh instance
+        // (preserving the instance tree for OnFreeze traversal and .sit.json generation).
+        // Object-based options and delegateOptions are always applied (they are static).
+        const isFreezePhase = !!this.capsuleInstance?.freezePhase
+        const hasFunctionOptions = typeof optionsFn === 'function'
+        const selfArg = { self: property.definition.depends ? this.self : minimalSelf, constants }
+        const delegateOpts = property.definition.delegateOptions
+        const resolvedDelegateOptions = delegateOpts
+            ? (typeof delegateOpts === 'function'
+                ? (isFreezePhase ? {} : await delegateOpts(selfArg))
+                : delegateOpts)
+            : undefined
+        const mappingOptions = resolvedDelegateOptions
+            || (hasFunctionOptions
+                ? (isFreezePhase
+                    ? {}  // truthy placeholder — signals "has options" without calling the function
+                    : await optionsFn(selfArg))
                 : optionsFn)
 
         // Check for existing instance in registry - reuse if available when no options
@@ -295,6 +374,7 @@ export class ContractCapsuleInstanceFactory {
 
                 // Only reuse if current mapping has no options
                 if (!mappingOptions) {
+                    this.timing?.record(`mapMappingProperty: REGISTRY REUSE ${capsuleName} (deferred proxy)`)
                     // Use deferred proxy that resolves from registry when accessed
                     // Works for both null (pre-registered) and actual instances
                     const apiTarget = this.getApiTarget({ property })
@@ -377,13 +457,16 @@ export class ContractCapsuleInstanceFactory {
             }
         }
 
-        // Merge nested capsule-name-targeted options into overrides
-        // These will be picked up when child capsules with matching names are instantiated
+        // Build transitive overrides for the child: merge any inherited transitive
+        // overrides with this mapping's nested capsule-name-targeted options.
+        // These flow as transitiveOverrides (not overrides) so they take precedence
+        // over the child's own Mapping options but runtime overrides remain less specific.
+        let mappedTransitiveOverrides: Record<string, any> | undefined = transitiveOverrides
         if (nestedCapsuleOptions) {
-            mappedOverrides = { ...mappedOverrides }
+            mappedTransitiveOverrides = { ...(mappedTransitiveOverrides || {}) }
             for (const [capsuleNameKey, capsuleOptions] of Object.entries(nestedCapsuleOptions)) {
-                mappedOverrides[capsuleNameKey] = {
-                    ...(mappedOverrides[capsuleNameKey] || {}),
+                mappedTransitiveOverrides[capsuleNameKey] = {
+                    ...(mappedTransitiveOverrides[capsuleNameKey] || {}),
                     ...capsuleOptions
                 }
             }
@@ -393,11 +476,13 @@ export class ContractCapsuleInstanceFactory {
         const mappedInstance = await mappedCapsule.makeInstance({
             overrides: mappedOverrides,
             options: ownMappingOptions,
+            transitiveOverrides: mappedTransitiveOverrides,
             runtimeSpineContracts: this.runtimeSpineContracts,
             rootCapsule: this.capsuleInstance?.rootCapsule,
             parentCapsuleSourceUriLineRefInstanceId: this.capsuleInstance?.capsuleSourceUriLineRefInstanceId,
             sit: this.capsuleInstance?.sit,
-            skipCache: isCapsuleStruct
+            skipCache: isCapsuleStruct,
+            freezePhase: this.capsuleInstance?.freezePhase || undefined
         })
 
         // Register the instance (replaces null pre-registration marker)
@@ -454,6 +539,20 @@ export class ContractCapsuleInstanceFactory {
         // Only update self if it wasn't already set (preserve child values)
         if (existingValue === undefined) {
             this.self[property.name] = value
+        }
+    }
+
+    protected mapConstantGetterFunctionProperty({ property }: { property: any }) {
+        const apiTarget = this.getApiTarget({ property })
+        // Pass self as constants — at instance creation time self contains capsule
+        // metadata, resolved Mappings, and all previously-processed properties.
+        const value = property.definition.value({ constants: this.self })
+
+        // Store eagerly like a Constant — available on self for subsequent properties
+        apiTarget[property.name] = value
+        this.self[property.name] = value
+        if (this.ownSelf) {
+            this.ownSelf[property.name] = value
         }
     }
 
@@ -744,7 +843,7 @@ export class ContractCapsuleInstanceFactory {
 
 
 
-export function CapsuleSpineContract({ freezeCapsule, resolve, importCapsule, spineFilesystemRoot }: { freezeCapsule?: (capsule: any) => Promise<any>, resolve?: (uri: string, parentFilepath: string) => Promise<string>, importCapsule?: (filepath: string) => Promise<any>, spineFilesystemRoot?: string } = {}) {
+export function CapsuleSpineContract({ freezeCapsule, resolve, importCapsule, spineFilesystemRoot, timing }: { freezeCapsule?: (capsule: any) => Promise<any>, resolve?: (uri: string, parentFilepath: string) => Promise<string>, importCapsule?: (filepath: string) => Promise<any>, spineFilesystemRoot?: string, timing?: TimingObserverInterface } = {}) {
 
     const instanceRegistry: CapsuleInstanceRegistry = new Map()
 
@@ -765,7 +864,8 @@ export function CapsuleSpineContract({ freezeCapsule, resolve, importCapsule, sp
                 instanceRegistry,
                 extendedCapsuleInstance,
                 runtimeSpineContracts,
-                capsuleInstance
+                capsuleInstance,
+                timing
             })
         },
         hydrate: ({ capsuleSnapshot }: { capsuleSnapshot: any }): any => {

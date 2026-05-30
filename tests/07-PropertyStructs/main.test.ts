@@ -214,6 +214,53 @@ it('Membrane construction & execution', async function () {
 })
 
 
+it('spineFilesystemRoot is accessible on the Capsule struct metadata', async function () {
+
+    const spineRoot = join(import.meta.dir, '../../../../..')
+
+    const { encapsulate, freeze, CapsulePropertyTypes, makeImportStack, hoistSnapshot } = await CapsuleSpineFactory({
+        spineFilesystemRoot: spineRoot,
+        capsuleModuleProjectionRoot: import.meta.dir,
+        enableCallerStackInference: true,
+        spineContracts: {
+            ['#' + CapsuleSpineContract['#']]: CapsuleSpineContract
+        },
+    })
+
+    const capsule1 = await encapsulate({
+        '#@stream44.studio/encapsulate/spine-contracts/CapsuleSpineContract.v0': {
+            '#@stream44.studio/encapsulate/structs/Capsule': {},
+            '#': {
+                name: {
+                    type: CapsulePropertyTypes.Literal,
+                    value: 'test'
+                },
+            }
+        }
+    }, {
+        importMeta: import.meta,
+        importStack: makeImportStack(),
+        capsuleName: 'spineFilesystemRootTest'
+    })
+
+    const { run } = await hoistSnapshot({
+        snapshot: await freeze()
+    })
+
+    const result = await run({}, async ({ apis }) => {
+        const api = apis[capsule1.capsuleSourceLineRef]
+        const structMeta = api['#@stream44.studio/encapsulate/structs/Capsule']
+        return {
+            spineFilesystemRoot: structMeta.spineFilesystemRoot,
+            hash: structMeta.capsuleSourceNameRefHash,
+        }
+    })
+
+    expect(result.spineFilesystemRoot).toBe(spineRoot)
+    expect(result.hash).toBeDefined()
+})
+
+
 it('Property struct with "as" alias', async function () {
 
     const membraneEvents: any[] = []

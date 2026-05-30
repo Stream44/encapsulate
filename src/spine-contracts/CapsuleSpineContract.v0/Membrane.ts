@@ -1,5 +1,6 @@
 import { CapsulePropertyTypes } from "../../encapsulate"
 import { ContractCapsuleInstanceFactory, CapsuleInstanceRegistry } from "./Static"
+import type { TimingObserverInterface } from "../../spine-factories/TimingObserver"
 
 type CallerContext = {
     capsuleSourceLineRef: string
@@ -86,7 +87,8 @@ class MembraneContractCapsuleInstanceFactory extends ContractCapsuleInstanceFact
         runtimeSpineContracts,
         instanceRegistry,
         extendedCapsuleInstance,
-        capsuleInstance
+        capsuleInstance,
+        timing
     }: {
         spineContractUri: string
         capsule: any
@@ -109,8 +111,9 @@ class MembraneContractCapsuleInstanceFactory extends ContractCapsuleInstanceFact
         instanceRegistry?: CapsuleInstanceRegistry
         extendedCapsuleInstance?: any
         capsuleInstance?: any
+        timing?: TimingObserverInterface
     }) {
-        super({ spineContractUri, capsule, self, ownSelf, encapsulatedApi, resolve, importCapsule, spineFilesystemRoot, freezeCapsule, instanceRegistry, extendedCapsuleInstance, capsuleInstance })
+        super({ spineContractUri, capsule, self, ownSelf, encapsulatedApi, resolve, importCapsule, spineFilesystemRoot, freezeCapsule, instanceRegistry, extendedCapsuleInstance, capsuleInstance, timing })
         this.getEventIndex = getEventIndex
         this.incrementEventIndex = incrementEventIndex
         this.getCurrentCallerContext = getCurrentCallerContext
@@ -137,7 +140,7 @@ class MembraneContractCapsuleInstanceFactory extends ContractCapsuleInstanceFact
         return ctx
     }
 
-    protected async mapMappingProperty({ overrides, options, property }: { overrides: any, options: any, property: any }) {
+    protected async mapMappingProperty({ overrides, options, transitiveOverrides, property }: { overrides: any, options: any, transitiveOverrides?: any, property: any }) {
 
         const mappedCapsule = await this.resolveMappedCapsule({ property })
         const constants = await this.extractConstants({ mappedCapsule })
@@ -151,9 +154,23 @@ class MembraneContractCapsuleInstanceFactory extends ContractCapsuleInstanceFact
         const minimalSelf = this.self[capsuleStructKey]
             ? { [capsuleStructKey]: this.self[capsuleStructKey] }
             : {}
-        const mappingOptions = property.definition.delegateOptions
-            || (typeof optionsFn === 'function'
-                ? await optionsFn({ self: property.definition.depends ? this.self : minimalSelf, constants })
+        // During freeze phase, skip calling function-based options callbacks — runtime
+        // overrides haven't been applied so self.* references may be incomplete.
+        // Use a truthy placeholder so the instance registry still creates a fresh instance.
+        const isFreezePhase = !!this.capsuleInstance?.freezePhase
+        const hasFunctionOptions = typeof optionsFn === 'function'
+        const selfArg = { self: property.definition.depends ? this.self : minimalSelf, constants }
+        const delegateOpts = property.definition.delegateOptions
+        const resolvedDelegateOptions = delegateOpts
+            ? (typeof delegateOpts === 'function'
+                ? (isFreezePhase ? {} : await delegateOpts(selfArg))
+                : delegateOpts)
+            : undefined
+        const mappingOptions = resolvedDelegateOptions
+            || (hasFunctionOptions
+                ? (isFreezePhase
+                    ? {}  // truthy placeholder
+                    : await optionsFn(selfArg))
                 : optionsFn)
 
         // Check for existing instance in registry - reuse if available (regardless of options)
@@ -270,13 +287,14 @@ class MembraneContractCapsuleInstanceFactory extends ContractCapsuleInstanceFact
             }
         }
 
-        // Merge nested capsule-name-targeted options into overrides
-        // These will be picked up when child capsules with matching names are instantiated
+        // Build transitive overrides for the child: merge any inherited transitive
+        // overrides with this mapping's nested capsule-name-targeted options.
+        let mappedTransitiveOverrides: Record<string, any> | undefined = transitiveOverrides
         if (nestedCapsuleOptions) {
-            mappedOverrides = { ...mappedOverrides }
+            mappedTransitiveOverrides = { ...(mappedTransitiveOverrides || {}) }
             for (const [capsuleNameKey, capsuleOptions] of Object.entries(nestedCapsuleOptions)) {
-                mappedOverrides[capsuleNameKey] = {
-                    ...(mappedOverrides[capsuleNameKey] || {}),
+                mappedTransitiveOverrides[capsuleNameKey] = {
+                    ...(mappedTransitiveOverrides[capsuleNameKey] || {}),
                     ...capsuleOptions
                 }
             }
@@ -285,11 +303,13 @@ class MembraneContractCapsuleInstanceFactory extends ContractCapsuleInstanceFact
         const mappedCapsuleInstance = await mappedCapsule.makeInstance({
             overrides: mappedOverrides,
             options: ownMappingOptions,
+            transitiveOverrides: mappedTransitiveOverrides,
             runtimeSpineContracts: this.runtimeSpineContracts,
             rootCapsule: this.capsuleInstance?.rootCapsule,
             parentCapsuleSourceUriLineRefInstanceId: this.capsuleInstance?.capsuleSourceUriLineRefInstanceId,
             sit: this.capsuleInstance?.sit,
-            skipCache: isCapsuleStruct
+            skipCache: isCapsuleStruct,
+            freezePhase: this.capsuleInstance?.freezePhase || undefined
         })
 
         // Register the instance (replaces null pre-registration marker)
@@ -475,6 +495,51 @@ class MembraneContractCapsuleInstanceFactory extends ContractCapsuleInstanceFact
                 this.onMembraneEvent?.(event)
                 this.encapsulatedApi[valueKey] = newValue
                 this.self[property.name] = newValue
+            },
+            enumerable: true,
+            configurable: true
+        })
+    }
+
+    protected override mapConstantGetterFunctionProperty({ property }: { property: any }) {
+        const value = property.definition.value({ constants: this.self })
+
+        // Store eagerly on self like a Constant
+        this.self[property.name] = value
+        if (this.ownSelf) {
+            this.ownSelf[property.name] = value
+        }
+
+        // Wrap with membrane event tracking (read-only like Constant)
+        Object.defineProperty(this.encapsulatedApi, property.name, {
+            get: () => {
+                const currentValue = this.self[property.name]
+
+                const event: any = {
+                    event: 'get',
+                    eventIndex: this.incrementEventIndex(),
+                    membrane: 'external',
+                    target: {
+                        capsuleSourceLineRef: this.encapsulateOptions.capsuleSourceLineRef,
+                        spineContractCapsuleInstanceId: this.id,
+                        prop: property.name,
+                    },
+                    value: currentValue
+                }
+
+                if (this.capsuleSourceNameRef) {
+                    event.target.capsuleSourceNameRef = this.capsuleSourceNameRef
+                }
+                if (this.capsuleSourceNameRefHash) {
+                    event.target.capsuleSourceNameRefHash = this.capsuleSourceNameRefHash
+                }
+
+                this.addCallerContextToEvent(event)
+                this.onMembraneEvent?.(event)
+                return currentValue
+            },
+            set: () => {
+                throw new Error(`Cannot set ConstantGetterFunction property '${property.name}'`)
             },
             enumerable: true,
             configurable: true
@@ -1001,7 +1066,8 @@ export function CapsuleSpineContract({
     spineFilesystemRoot,
     resolve,
     importCapsule,
-    npmUriForFilepath
+    npmUriForFilepath,
+    timing
 }: {
     onMembraneEvent?: (event: any) => void
     freezeCapsule?: (capsule: any) => Promise<any>
@@ -1010,6 +1076,7 @@ export function CapsuleSpineContract({
     resolve?: (uri: string, parentFilepath: string) => Promise<string>
     importCapsule?: (filepath: string) => Promise<any>
     npmUriForFilepath?: (filepath: string) => Promise<string | null>
+    timing?: TimingObserverInterface
 } = {}) {
 
     let eventIndex = 0
@@ -1070,7 +1137,8 @@ export function CapsuleSpineContract({
                 runtimeSpineContracts,
                 instanceRegistry,
                 extendedCapsuleInstance,
-                capsuleInstance
+                capsuleInstance,
+                timing
             })
         },
         hydrate: ({ capsuleSnapshot }: { capsuleSnapshot: any }): any => {

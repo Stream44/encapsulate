@@ -65,6 +65,18 @@ const userService = await encapsulate({
                 value: '1.0.0'
             },
 
+            // ConstantGetterFunction: eagerly evaluated during property mapping.
+            // Receives { constants } (not this) — constants contains all Literal/String/Constant
+            // values from the same capsule, resolved Mapping constants, and capsule metadata.
+            // The computed result is stored on self like a Constant and included in extractConstants.
+            derivedPath: {
+                type: CapsulePropertyTypes.ConstantGetterFunction,
+                value: function ({ constants }: { constants: any }): string {
+                    const meta = constants['#@stream44.studio/encapsulate/structs/Capsule']
+                    return `/workbench/${meta.capsuleName}`
+                }
+            },
+
             // --- Function Properties ---
 
             // Function: bound to a self proxy. Receives arguments. Callable on the API.
@@ -253,6 +265,7 @@ Reference
 | `Literal` | read/write | read/write | yes | General-purpose value. Supports any JS type including `Map`, `Set`, etc. |
 | `String` | read/write | read/write | yes | Alias for `Literal`. Semantic hint for string values. |
 | `Constant` | read-only | read | no | Immutable value. Membrane contract throws on assignment. |
+| `ConstantGetterFunction` | read-only | read | no | Eagerly evaluated computed constant. See below. |
 
 All value types accept a `value` in their definition. `undefined` means "no default — must be supplied via overrides/options".
 
@@ -316,6 +329,35 @@ When `api.name(...args)` is called:
 2. `target()` runs with self proxy as `this`, returning the function to call
 3. The target function is called with the transformed args (awaited if `invoke` returns a promise)
 
+#### ConstantGetterFunction
+
+`ConstantGetterFunction` is a computed constant — eagerly evaluated during property mapping, with its result stored on `self` like a `Constant`. Unlike `GetterFunction` (bound to `this`, evaluated lazily on each access), `ConstantGetterFunction` receives an explicit `{ constants }` parameter and is evaluated once.
+
+```ts
+workbenchDir: {
+    type: CapsulePropertyTypes.ConstantGetterFunction,
+    value: function ({ constants }: { constants: any }): string {
+        const meta = constants['#@stream44.studio/encapsulate/structs/Capsule']
+        const capsuleDir = constants.lib.path.dirname(meta.rootCapsule.moduleFilepath)
+        const testName = constants.lib.path.basename(meta.rootCapsule.moduleFilepath).replace(/\.[^.]+$/, '')
+        return constants.lib.path.join(capsuleDir, '.~o/workbenches', testName)
+    }
+}
+```
+
+**What `constants` contains:**
+
+| Context | Contents |
+|---|---|
+| During `extractConstants` (parent Mapping) | `Literal`/`String`/`Constant` values from the capsule definition, resolved `Mapping` constants (nested), and capsule metadata including `rootCapsule` |
+| During `mapProperty` (instance creation) | `self` — all previously-processed properties, capsule metadata, resolved Mappings |
+
+**Key properties:**
+- **No `this` binding** — receives `{ constants }` as a plain function argument, making dependencies explicit
+- **Available in parent's `constants`** — when a parent maps this capsule, the computed value is included in the `constants` parameter passed to the parent's `options` callback
+- **Mapping constants are nested** — `constants.lib.path` accesses the `path` Constant from a mapped `lib` capsule
+- **Capsule metadata** — `constants['#@stream44.studio/encapsulate/structs/Capsule']` includes `capsuleName`, `moduleFilepath`, and `rootCapsule` (the top-level capsule in the spine)
+
 ### Mapping
 
 `Mapping` composes another capsule as a sub-component.
@@ -333,7 +375,7 @@ prop: {
 - **`value`** — a capsule reference (from `encapsulate()`) or a string URI resolved relative to the current module.
 - **`options`** — forwarded to the mapped capsule. Keys starting with `'#'` target the mapped capsule's own property contracts. Keys without `'#'` are matched against capsule names deeper in the mapping tree (nested capsule-name-targeted options).
 - **`options({ self, constants })`** — when `options` is a function, it receives `{ self, constants }`.
-  - `constants` — all `Literal`/`String` values from the mapped capsule's definition.
+  - `constants` — all `Literal`/`String`/`Constant` values from the mapped capsule's definition, computed `ConstantGetterFunction` results, resolved `Mapping` constants (nested by property name), and capsule metadata (`constants['#@stream44.studio/encapsulate/structs/Capsule']` with `rootCapsule`).
   - `self` — always contains the Capsule metadata struct (`self['#@stream44.studio/encapsulate/structs/Capsule']` with `moduleFilepath`, `capsuleName`, etc.). When `depends` is specified, `self` also contains the full parent capsule's resolved sibling mappings.
 - **`depends`** — array of sibling property names that must be resolved before this mapping's `options` function runs. Enables `options({ self })` to access already-resolved siblings (e.g. `self.$auth.realm`). Can be declared explicitly or auto-injected by the static analyzer when it detects `self.<name>` references in the options function body.
 - **Instance reuse** — named capsules are registered in an instance registry. If a capsule with the same name is mapped multiple times without options, the existing instance is reused via a deferred proxy.

@@ -3,6 +3,7 @@ import { join, normalize, dirname, resolve, relative } from 'path'
 import { readFile, stat } from 'fs/promises'
 import * as ts from 'typescript'
 import { createHash } from 'crypto'
+import type { TimingObserverInterface } from './spine-factories/TimingObserver'
 
 // Known exports from @stream44.studio/encapsulate/encapsulate that can be imported
 const ENCAPSULATE_MODULE_EXPORTS = new Set([
@@ -227,7 +228,7 @@ export function StaticAnalyzer({
     cacheStore,
     spineStore
 }: {
-    timing?: { record: (step: string) => void, chalk?: any },
+    timing?: TimingObserverInterface,
     cacheStore?: {
         writeFile?: (filepath: string, content: string) => Promise<void>,
         readFile?: (filepath: string) => Promise<string | undefined>,
@@ -240,7 +241,15 @@ export function StaticAnalyzer({
 
     timing?.record('StaticAnalyzer: Initialized')
 
+    let _cacheMissCount = 0
+
     return {
+
+        /** Returns true if any parseModule call resulted in a cache miss (CST regeneration) */
+        hasCacheMisses: () => _cacheMissCount > 0,
+
+        /** Reset the cache miss counter (call before a new freeze cycle) */
+        resetCacheMisses: () => { _cacheMissCount = 0 },
 
         parseModule: async ({ spineOptions, encapsulateOptions }: { spineOptions: any, encapsulateOptions: any }) => {
 
@@ -282,7 +291,8 @@ export function StaticAnalyzer({
                             // Check cache bust version - if mismatch, regenerate
                             const cachedVersion = cachedCsts?.[capsuleSourceLineRef]?.cacheBustVersion
                             if (encapsulateOptions.cacheBustVersion !== undefined && cachedVersion !== encapsulateOptions.cacheBustVersion) {
-                                timing?.record(timing?.chalk?.red?.(`StaticAnalyzer: Cache BUST (version mismatch: ${cachedVersion} !== ${encapsulateOptions.cacheBustVersion}) for ${encapsulateOptions.moduleFilepath}`))
+                                _cacheMissCount++
+                                timing?.record(`StaticAnalyzer: Cache BUST (version mismatch: ${cachedVersion} !== ${encapsulateOptions.cacheBustVersion}) for ${encapsulateOptions.moduleFilepath}`, { color: 'red' })
                             } else {
                                 timing?.record(`StaticAnalyzer: Cache HIT for ${encapsulateOptions.moduleFilepath}`)
                                 return {
@@ -293,10 +303,12 @@ export function StaticAnalyzer({
                             }
                         }
                     }
-                    timing?.record(timing?.chalk?.red?.(`StaticAnalyzer: Cache MISS for ${encapsulateOptions.moduleFilepath}`))
+                    _cacheMissCount++
+                    timing?.record(`StaticAnalyzer: Cache MISS for ${encapsulateOptions.moduleFilepath}`, { color: 'red' })
                 } catch (error) {
                     // Cache miss or error, continue with normal parsing
-                    timing?.record(timing?.chalk?.red?.(`StaticAnalyzer: Cache error for ${encapsulateOptions.moduleFilepath}`))
+                    _cacheMissCount++
+                    timing?.record(`StaticAnalyzer: Cache error for ${encapsulateOptions.moduleFilepath}`, { color: 'red' })
                 }
             }
 

@@ -10,7 +10,7 @@ it('Minimal construction & execution', async function () {
 
     const { encapsulate, run, CapsulePropertyTypes, makeImportStack } = await CapsuleSpineFactory({
         spineFilesystemRoot: join(import.meta.dir, '../../../../..'),
-        staticAnalysisEnabled: false,
+        staticAnalysisEnabled: true,
         spineContracts: {
             ['#' + CapsuleSpineContract['#']]: CapsuleSpineContract
         }
@@ -99,7 +99,7 @@ describe('Membrane spine contract with Constant property', () => {
 
         const { encapsulate, CapsulePropertyTypes, makeImportStack, commonSpineContractOpts } = await CapsuleSpineFactory({
             spineFilesystemRoot,
-            staticAnalysisEnabled: false,
+            staticAnalysisEnabled: true,
             spineContracts: {
                 ['#' + MembraneCapsuleSpineContract['#']]: MembraneCapsuleSpineContract
             }

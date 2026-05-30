@@ -9,7 +9,7 @@ it('Extend another capsule', async function () {
 
     const { encapsulate, run, CapsulePropertyTypes, makeImportStack } = await CapsuleSpineFactory({
         spineFilesystemRoot: join(import.meta.dir, '../../../../..'),
-        staticAnalysisEnabled: false,
+        staticAnalysisEnabled: true,
         spineContracts: {
             ['#' + CapsuleSpineContract['#']]: CapsuleSpineContract
         }
@@ -66,7 +66,8 @@ it('Extend another capsule', async function () {
         extendsCapsule: capsule1,
         importMeta: import.meta,
         importStack: makeImportStack(),
-        capsuleName: 'capsule2'
+        capsuleName: 'capsule2',
+        ambientReferences: { capsule1 }
     })
 
     // ##################################################
@@ -101,7 +102,7 @@ it('Extend capsule using string URI (relative path)', async function () {
 
     const { encapsulate, run, CapsulePropertyTypes, makeImportStack } = await CapsuleSpineFactory({
         spineFilesystemRoot: join(import.meta.dir, '../../../../..'),
-        staticAnalysisEnabled: false,
+        staticAnalysisEnabled: true,
         spineContracts: {
             ['#' + CapsuleSpineContract['#']]: CapsuleSpineContract
         }
@@ -150,7 +151,7 @@ it('Capsule that both extends and maps the same capsule', async function () {
 
     const { encapsulate, run, CapsulePropertyTypes, makeImportStack } = await CapsuleSpineFactory({
         spineFilesystemRoot: join(import.meta.dir, '../../../../..'),
-        staticAnalysisEnabled: false,
+        staticAnalysisEnabled: true,
         spineContracts: {
             ['#' + CapsuleSpineContract['#']]: CapsuleSpineContract
         }
@@ -202,7 +203,8 @@ it('Capsule that both extends and maps the same capsule', async function () {
         extendsCapsule: baseCapsule,
         importMeta: import.meta,
         importStack: makeImportStack(),
-        capsuleName: 'capsule4'
+        capsuleName: 'capsule4',
+        ambientReferences: { baseCapsule }
     })
 
     const result = await run({
@@ -234,7 +236,7 @@ it('Extended capsule function should see child capsule properties in this contex
 
     const { encapsulate, run, CapsulePropertyTypes, makeImportStack } = await CapsuleSpineFactory({
         spineFilesystemRoot: join(import.meta.dir, '../../../../..'),
-        staticAnalysisEnabled: false,
+        staticAnalysisEnabled: true,
         spineContracts: {
             ['#' + CapsuleSpineContract['#']]: CapsuleSpineContract
         }
@@ -284,7 +286,8 @@ it('Extended capsule function should see child capsule properties in this contex
         extendsCapsule: parentCapsule,
         importMeta: import.meta,
         importStack: makeImportStack(),
-        capsuleName: 'childCapsule'
+        capsuleName: 'childCapsule',
+        ambientReferences: { parentCapsule }
     })
 
     const result = await run({}, async ({ apis }) => {
@@ -307,7 +310,7 @@ it('Mapped capsule that extends another should have correct this context', async
 
     const { encapsulate, run, CapsulePropertyTypes, makeImportStack } = await CapsuleSpineFactory({
         spineFilesystemRoot: join(import.meta.dir, '../../../../..'),
-        staticAnalysisEnabled: false,
+        staticAnalysisEnabled: true,
         spineContracts: {
             ['#' + CapsuleSpineContract['#']]: CapsuleSpineContract
         }
@@ -350,7 +353,8 @@ it('Mapped capsule that extends another should have correct this context', async
         extendsCapsule: baseCapsule,
         importMeta: import.meta,
         importStack: makeImportStack(),
-        capsuleName: 'configCapsule'
+        capsuleName: 'configCapsule',
+        ambientReferences: { baseCapsule }
     })
 
     // Main capsule maps the config capsule (like WorkspaceStatus.v0 maps ProjectDeploymentConfig.v0)
@@ -402,7 +406,7 @@ it('Override on parent capsule should be visible to child that extends it', asyn
 
     const { encapsulate, run, CapsulePropertyTypes, makeImportStack } = await CapsuleSpineFactory({
         spineFilesystemRoot: join(import.meta.dir, '../../../../..'),
-        staticAnalysisEnabled: false,
+        staticAnalysisEnabled: true,
         spineContracts: {
             ['#' + CapsuleSpineContract['#']]: CapsuleSpineContract
         }
@@ -445,7 +449,8 @@ it('Override on parent capsule should be visible to child that extends it', asyn
         extendsCapsule: parentCapsule,
         importMeta: import.meta,
         importStack: makeImportStack(),
-        capsuleName: 'childCapsule'
+        capsuleName: 'childCapsule',
+        ambientReferences: { parentCapsule }
     })
 
     // Main capsule maps the child capsule (like WorkspaceStatus.v0 maps ProjectDeploymentConfig.v0)
@@ -499,7 +504,7 @@ it('Property contract delegate options should be passed to struct capsule', asyn
 
     const { encapsulate, run, CapsulePropertyTypes, makeImportStack } = await CapsuleSpineFactory({
         spineFilesystemRoot: join(import.meta.dir, '../../../../..'),
-        staticAnalysisEnabled: false,
+        staticAnalysisEnabled: true,
         spineContracts: {
             ['#' + CapsuleSpineContract['#']]: CapsuleSpineContract
         }
@@ -550,7 +555,7 @@ it('this.self should access only own capsule properties, this should access all 
 
     const { encapsulate, run, CapsulePropertyTypes, makeImportStack } = await CapsuleSpineFactory({
         spineFilesystemRoot: join(import.meta.dir, '../../../../..'),
-        staticAnalysisEnabled: false,
+        staticAnalysisEnabled: true,
         spineContracts: {
             ['#' + CapsuleSpineContract['#']]: CapsuleSpineContract
         }
@@ -618,7 +623,8 @@ it('this.self should access only own capsule properties, this should access all 
         extendsCapsule: parentCapsule,
         importMeta: import.meta,
         importStack: makeImportStack(),
-        capsuleName: 'childCapsule'
+        capsuleName: 'childCapsule',
+        ambientReferences: { parentCapsule }
     })
 
     const result = await run({}, async ({ apis }) => {
@@ -646,7 +652,7 @@ it('this.self should work with GetterFunction properties', async function () {
 
     const { encapsulate, run, CapsulePropertyTypes, makeImportStack } = await CapsuleSpineFactory({
         spineFilesystemRoot: join(import.meta.dir, '../../../../..'),
-        staticAnalysisEnabled: false,
+        staticAnalysisEnabled: true,
         spineContracts: {
             ['#' + CapsuleSpineContract['#']]: CapsuleSpineContract
         }
@@ -708,7 +714,8 @@ it('this.self should work with GetterFunction properties', async function () {
         extendsCapsule: parentCapsule,
         importMeta: import.meta,
         importStack: makeImportStack(),
-        capsuleName: 'childCapsule'
+        capsuleName: 'childCapsule',
+        ambientReferences: { parentCapsule }
     })
 
     const result = await run({}, async ({ apis }) => {
@@ -734,7 +741,7 @@ it('extendsCapsule with relative string URI resolves from co-located spineFilesy
     // This simulates the case where a test maps a capsule that uses extendsCapsule: './base-capsule'
     const { encapsulate, run, CapsulePropertyTypes, makeImportStack } = await CapsuleSpineFactory({
         spineFilesystemRoot: import.meta.dir,
-        staticAnalysisEnabled: false,
+        staticAnalysisEnabled: true,
         spineContracts: {
             ['#' + CapsuleSpineContract['#']]: CapsuleSpineContract
         }
@@ -768,7 +775,7 @@ it('Child Function override should be called when parent Function uses this.meth
 
     const { encapsulate, run, CapsulePropertyTypes, makeImportStack } = await CapsuleSpineFactory({
         spineFilesystemRoot: join(import.meta.dir, '../../../../..'),
-        staticAnalysisEnabled: false,
+        staticAnalysisEnabled: true,
         spineContracts: {
             ['#' + CapsuleSpineContract['#']]: CapsuleSpineContract
         }
@@ -815,7 +822,8 @@ it('Child Function override should be called when parent Function uses this.meth
         extendsCapsule: parentCapsule,
         importMeta: import.meta,
         importStack: makeImportStack(),
-        capsuleName: 'childCapsule'
+        capsuleName: 'childCapsule',
+        ambientReferences: { parentCapsule }
     })
 
     const result = await run({}, async ({ apis }) => {
@@ -855,7 +863,7 @@ it('scoped package URI resolves via filesystem convention walk-up when spineRoot
 
     const factory = await CapsuleSpineFactory({
         spineFilesystemRoot: import.meta.dir,
-        staticAnalysisEnabled: false,
+        staticAnalysisEnabled: true,
         spineContracts: {
             ['#' + CapsuleSpineContract['#']]: CapsuleSpineContract
         }
